@@ -1,0 +1,26 @@
+Hive Axyl AI Toolkit
+Copyright 2026 Com2uS Platform Corp.
+
+This product is licensed under the Apache License, Version 2.0.
+See the LICENSE file for the full license text.
+
+------------------------------------------------------------------------
+LOGOS AND TRADEMARKS
+
+The logo image files in the assets/ directory (currently assets/icon.png
+and assets/logo.png) are Copyright 2026 Com2uS Platform Corp. and are
+not licensed under the Apache License, Version 2.0. You may use,
+display, and redistribute them only as part of an unmodified copy of
+this repository or of the plugin distributed from it. Do not modify them
+or use them to identify any other product, including a modified version
+of this plugin; remove or replace them in any such version.
+
+The Hive Axyl and Com2uS Platform names and logos are the property of
+Com2uS Platform Corp. As Section 6 of the Apache License, Version 2.0
+states, the license does not grant permission to use the trade names,
+trademarks, service marks, or product names of the Licensor, except as
+required for reasonable and customary use in describing the origin of
+the Work and reproducing the content of this NOTICE file.
+
+Other names and marks mentioned in this repository are the property of
+their respective owners.
