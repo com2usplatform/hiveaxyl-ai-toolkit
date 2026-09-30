@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "analytics-mcp": {
+      "type": "http",
+      "url": "https://analytics-mcp.withhive.com/mcp"
+    },
+    "hive-axyl": {
+      "type": "http",
+      "url": "https://mcp.hiveaxyl.com/mcp/v1/mcp"
+    }
+  }
+}

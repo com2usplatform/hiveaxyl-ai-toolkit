@@ -1,0 +1,8 @@
+interface:
+  display_name: Axyl Developer Guide
+  short_description: Implement Axyl features from official Axyl developer guides when no feature-specific skill applies.
+policy:
+  products:
+    - CHAT
+    - CODEX
+  allow_implicit_invocation: true
