@@ -4,6 +4,7 @@
 import argparse
 import csv
 import os
+import unicodedata
 from pathlib import Path
 
 
@@ -30,7 +31,7 @@ def validate_csv_cell(label: str, value: str) -> str:
         raise ValueError(f"{label} must be at most {MAX_CELL_LENGTH} characters")
     if normalized.startswith(FORMULA_PREFIXES):
         raise ValueError(f"{label} must not start with a spreadsheet formula prefix")
-    if any(ord(character) < 32 for character in normalized):
+    if any(unicodedata.category(character) == "Cc" for character in normalized):
         raise ValueError(f"{label} must not contain control characters")
     return normalized
 

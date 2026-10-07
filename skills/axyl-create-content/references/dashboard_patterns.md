@@ -39,7 +39,7 @@ Every dashboard example below is a request whose composition is already decided.
 → [
     chart·scorecard: NU,
     chart·line:      Daily NU trend,
-    retention:       NU retention (base_event=login+newUser=Y, retention_event=login, identifier=deviceId)
+    retention:       NU retention (base_event=login+newUser=Y, retention_event=login, identifier=userId)
   ]
 ```
 

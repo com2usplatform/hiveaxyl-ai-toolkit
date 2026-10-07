@@ -44,12 +44,12 @@ The two modes can be mixed. **Prefer metric mode** — pass any metric registere
 
 #### Metric mode (when registered in `list_metrics` — preferred)
 
-An ordinary metric uses `metric_idx` and `metric_name`. A revenue metric additionally passes `metric_config` and the
+An ordinary metric uses `metric_idx` and `metric_name`. A revenue metric additionally passes the
 confirmed `currency`.
 
 - `metric_idx`: the `idx` from the `list_metrics()` result. Do not guess it.
 - `metric_name`: the `metric_name` from the `list_metrics()` result (for display). Do not guess it.
-- `metric_config`: the `metric_config` string from the `list_metrics()` result. Needed for a revenue metric.
+- `metric_config`: optional. The `metric_config` string from the `list_metrics()` result; passing it saves a server lookup, and when omitted the server looks it up by `metric_idx`.
 - `currency`: only for a revenue metric. For example, `"USD"` (confirm with `list_currencies`; if the result is empty, use `"USD"`)
 - `alias`: the metric name to display in the result (if absent, `metric_name` is shown as is)
 

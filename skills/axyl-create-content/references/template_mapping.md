@@ -110,11 +110,11 @@ That is why the tool does the mapping and the skill uses its result. Do not matc
 | `table_idx` | **`event_idx`** | The value is already the company's idx. **Change the key name when passing it** |
 | `event_name` | `event_name` | As is (the tool fills it in when the template lacks it) |
 | `title` | `title` | As is |
-| `identifier` | `identifier` | As is (see below) |
+| `identifier` (first step), `target_identifier` (later steps) | `identifier` | The template stores the first step's identifier in `identifier` and each later step's in `target_identifier`. Pass each step's value as `identifier` (see below) |
 | `filters` | `filters` | Only `filter_type="index"` is converted. Leave snapshot/segment as is; if one is not this company's, **do not drop it silently** (see below) |
 | `table_description` | `table_description` | As is. May be omitted |
 | `table_type` | `table_type` | **The value systems differ.** The template uses `"table"`, the argument uses `"hive"`\|`"adjust"`\|`"appsflyer"` — use the default `"hive"` |
-| `identifier_type`, `target_identifier`, `target_identifier_type`, `logical_operator`, `table_name`, `segment_idx` | none | **Discard them.** The tool builds them internally |
+| `identifier_type`, `target_identifier_type`, `logical_operator`, `table_name`, `segment_idx` | none | **Discard them.** The tool builds them internally |
 
 Passing `table_idx` through as is fails with a missing required `event_idx` key.
 

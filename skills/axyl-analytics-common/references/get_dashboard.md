@@ -29,11 +29,8 @@ layout hints, and the Analytics console URL.
 
 ## Decision Rules
 
-- **Do not judge duplication by the `content_idx` set of the member content.** Recreating the same composition
-  copies the member content too, so a copy shares no idx at all with the original. Compare by `content_name`
-  and the `metrics` sets.
-- If the member-name set matches and `date_params` also matches, treat it as a copy: do not create it yet —
-  present the existing URL and let the user choose reuse, create a copy, or skip (DUPLICATE_GATE).
+- The returned member list (`content_name`, `metrics`) and `date_params` are what a duplicate check compares; a
+  recreated dashboard copies its members, so member `content_idx` values never match the original.
 - If the composition only partially overlaps, offer to add the missing content to the existing dashboard, create a
   separate copy, or skip. To add or remove content, pass the full new list to `update_dashboard` after WRITE_APPROVAL,
   carrying over the `width`/`height`/`memo` this tool returned so the existing layout is kept.

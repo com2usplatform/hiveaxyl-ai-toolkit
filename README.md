@@ -10,7 +10,7 @@ Hive Axyl helps game teams develop and operate games through SDK integration gui
 | Product | `hiveaxyl` |
 | Domain | `ai` |
 | Artifact | `plugin` |
-| Version | `1.0.0` |
+| Version | `2.0.0` |
 | Lifecycle | `active` |
 | Official status | Official |
 | License | Apache-2.0, except the logo images (see [NOTICE](NOTICE)) |

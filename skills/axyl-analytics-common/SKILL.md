@@ -3,7 +3,7 @@ name: axyl-analytics-common
 metadata:
   version: "1.0.0"
 description: |
-  Common rules that all skills using the Hive Analytics MCP server must follow.
+  Common rules that all skills using the Hive Analytics tools of the Hive Axyl MCP server must follow.
   Do not use this document on its own; read it as a prerequisite alongside skills such as axyl-drill-down-metrics.
 
   TRIGGER when:
@@ -174,6 +174,7 @@ Use the `axyl-create-segment` skill for segment creation and snapshot workflows.
 
 | Principle | Description |
 |------|------|
+| **MCP_CONNECTION_GATE** | Before any Analytics request, confirm that the Analytics tools (such as `list_projects`) are available. If they are missing or a call fails with an authentication error, do not query, guess a project, or plan the analysis. Tell the user to sign in to the Hive Axyl MCP server from the host's MCP server list, naming the server as the host shows it, then stop and ask them to repeat the request after signing in. |
 | **PROJECT_ID_GATE** | Verify the project before every tool call. If no project has been identified, present candidates and stop. |
 | **ORG_WORKSPACE_GATE** | Verify `org_idx` and `workspace_idx` before calling any tool that takes both — `preview_*` (including `preview_chart_rank`), `create_*` content and dashboard tools, `update_*` content and dashboard tools, `get_content`, `get_dashboard`. If they have not been confirmed, present candidates and stop. |
 | **SETTING_ACCESS_GATE** | Verify the accessible organization and its projects before querying Analytics configuration. |
@@ -268,7 +269,8 @@ Before querying users excluded from metrics or metric start dates:
    conversation, reuse it.
 2. If `company_cd` is unavailable, use `list_projects()` only to identify the company; do not confirm a project from it.
 3. First call `list_organizations(company_cd)` without a project filter to identify accessible organizations.
-4. If there are no organizations, do not guess `org_idx`; report that the configuration cannot be queried.
+4. If there are no organizations, do not guess `org_idx`; report that the configuration cannot be queried. An Analytics
+   administrator can create the first organization with `regist_org`.
 5. If there is exactly one organization, use it. If there are two or more, show them ALL by name and
    have the user choose. `last_org_flag='Y'` is a display label ("last accessed") only, never a default or a basis
    for automatically confirming the configuration target.
@@ -286,7 +288,8 @@ Before querying users excluded from metrics or metric start dates:
 Before calling `regist_except_users`, `regist_start_dates`, `regist_metric_filter`, `regist_currency`, `get_org_details`,
 or `regist_org`:
 
-1. Reuse the `company_cd`, `org_idx`, and `appid_group` confirmed through SETTING_ACCESS_GATE.
+1. Reuse the `company_cd`, `org_idx`, and `appid_group` confirmed through SETTING_ACCESS_GATE. `regist_org` creates an
+   organization and needs only `company_cd`, so it does not require an existing `org_idx` or `appid_group`.
 2. Verify that `check_analytics_admin(company_cd)` returns `true`.
 3. If the user is not an administrator, do not call a registration tool. Provide the current configuration query result
    and the request details to send to an Analytics administrator.
@@ -365,8 +368,10 @@ Step 4. Same content     → present the existing console URL and ask the user t
   built from registered metrics — measures built from events, and the events of funnels and retentions, do not
   appear in the list, so it comes back `metrics_comparable=false` or holds only part of the real composition.
 - Pass **only metric measure names** in `metrics`. Passing event names makes you miss candidates.
-- **Do not compare dashboards by the idx set of their member content.** Recreating the same composition also
-  copies the member content, so every idx differs. Compare by name and metric sets.
+- **Dashboard copy criteria.** Treat a dashboard as a copy only when the member name set and the metric sets match,
+  each member has the same `project` and filters (check with `get_content`), and `date_params` match. Do not compare
+  by the idx set of the member content: recreating the same composition also copies the members, so every idx
+  differs. This is the only place these criteria are defined; other skills follow it.
 - This check is a read, so perform it without approval, and present the result when asking for WRITE_APPROVAL.
 - If the user knows about the duplicate and still asks for a new one, create it. The gate **informs**; it does
   not block.
@@ -498,7 +503,7 @@ The user is not a developer. The following are **internal values** used to call 
 | Event or dimension is unclear | Call list_events(company_cd), then select from the list |
 | No company permissions | Explain that access is unavailable. Recheck the accessible list with `list_projects` |
 | Organization cannot access the project / user is not a workspace member | Perform ORG_WORKSPACE_GATE again. Recheck accessible organizations and workspaces with `list_organizations`/`list_workspaces` |
-| MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Explain that the user must sign in again. Cannot retry without user action |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE. Cannot retry without user action |
 | Currency not specified | Check with `list_currencies(company_cd)`: use the sole result, ask the user when there are multiple, or default to `USD` and disclose the fallback when empty |
 | Empty result | Explain that there is no data. Suggest checking the date range and project |
 | Duplicate content found | Do not save yet. Present the existing console URL and let the user choose reuse, create a copy, or skip — create it if they still want a new one |
