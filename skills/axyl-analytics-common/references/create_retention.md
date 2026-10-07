@@ -23,7 +23,6 @@ All query parameters follow `preview_retention`: `project`, `date_params`, `base
 - If `chart_type="table"`, the server automatically includes the default `grid_config` (no separate value is needed).
 - `content_name`: Name of the content to save (default: `"retention"`). A meaningful name is recommended.
 - `content_description`: Optional.
-- For NU retention, `identifier="deviceId"` is recommended (see the preview_retention document).
 - `org_idx` is accepted only for authorization and is not included in the saved body.
 
 ## Return Value

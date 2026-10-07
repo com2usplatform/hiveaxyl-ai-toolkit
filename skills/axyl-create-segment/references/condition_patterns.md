@@ -31,9 +31,14 @@
 | "users who are X" (one selectable value) | `""` | One value in `start_value` |
 | "users who are X or Y" | `"include"` | Several comma-separated values in `start_value` (`"ko,en"`) |
 | "users who are not X" | `"notinclude"` | The value to exclude |
-| "at least N", "more than N won" | `"more"` | `start_value=N` |
-| "at most N", "under N" | `"less"` | `start_value=N` |
+| "at least N" | `"more"` | `start_value=N` |
+| "more than N", "over N won" (excludes N) | `"more"` | Whole-number values (counts, levels, KRW amounts): `start_value=N+1`. Decimal values: N plus the property's smallest step (`0.01` for USD) |
+| "at most N" | `"less"` | `start_value=N` |
+| "under N", "less than N" (excludes N) | `"less"` | Whole-number values: `start_value=N-1`. Decimal values: N minus the property's smallest step |
 | "between N and M" | `"between"` | `start_value=N`, `end_value=M` |
+
+`"more"` and `"less"` include N itself (at least / at most), so an exclusive phrase needs the adjusted value. Tell the
+user which boundary you used; when the property's smallest step is unknown, confirm the boundary with the user.
 
 ## Group Combination Rules
 

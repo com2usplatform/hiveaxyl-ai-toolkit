@@ -178,8 +178,7 @@ Dashboard request                      → create_dashboard(contents=[the conten
                                           → return the dashboard url
 ```
 
-**Do not compare dashboard duplicates by the `content_idx` set of their member content.** Recreating the same composition
-also copies the child content, so every idx differs — compare by the `content_name` and `metrics` sets.
+Judge dashboard duplicates by the dashboard copy criteria in axyl-analytics-common DUPLICATE_GATE.
 To add content to an existing dashboard, read it with `get_dashboard`, then pass the full new list to `update_dashboard`
 after WRITE_APPROVAL, carrying over each existing item's `width`/`height`/`memo` so the current layout is kept.
 Create a new dashboard only after showing the final composition and target workspace and obtaining WRITE_APPROVAL.
@@ -214,7 +213,7 @@ Per content item: preview_<type> → [duplicate check: get_content] → [WRITE_A
 | Duplicate unchecked | Saving without checking existing content | Find candidates with `list_contents` → confirm with `get_content` |
 | Duplicate candidate found | Declaring "it already exists" from `match` alone | Compare in detail, then ask the user to reuse, copy, or skip |
 | Metrics look empty | Concluding it is not a duplicate | It is event-based and so absent from the list — confirm with `get_content` |
-| Dashboard duplicate | Comparing by the member `content_idx` set | Compare by the `content_name` and `metrics` sets (a copy has different idx values) |
+| Dashboard duplicate | Comparing by the member `content_idx` set | Follow the dashboard copy criteria in axyl-analytics-common DUPLICATE_GATE (a copy has different idx values) |
 | content_idx | Guessing or inventing it | Use only a `create_*` return value, or an existing idx confirmed to be in the same workspace with `get_content` |
 | org_idx/workspace_idx unconfirmed | Calling with an arbitrary value (for example, 0) | Perform ORG_WORKSPACE_GATE, then retry |
 | Metric or event unclear | Guessing and passing it | Confirm with list_metrics/list_events/list_dimensions |
@@ -230,7 +229,7 @@ Per content item: preview_<type> → [duplicate check: get_content] → [WRITE_A
 | Duplicate content found | Present the existing URL and the differences, and have the user choose to reuse, copy, or skip |
 | Too many `list_contents` candidates | Narrow with `workspace_idx`; if still too many, add `mine_only=true` or `content_type` |
 | `list_contents` `truncated=true` | There are more candidates — do not conclude "no duplicate"; narrow the filters and query again |
-| `create_*` failed | Check the server response in the error message → fix the parameters and retry. Stop if it is before dashboard assembly |
+| `create_*` failed | Parameter or validation error: fix the parameters and retry. Save API error: do not retry — the first request may have succeeded, so check with `list_contents` whether it was created. Stop if it is before dashboard assembly |
 | Some content failed during dashboard assembly | Ask the user whether to proceed with only the successful `content_idx` values |
 | Organization or workspace authorization error | Perform ORG_WORKSPACE_GATE again |
-| MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Explain that the user must sign in again. Cannot retry without user action |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

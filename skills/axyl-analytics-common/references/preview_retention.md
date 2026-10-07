@@ -19,7 +19,7 @@
 | `company_cd` | Y | Company code. The `company_cd` from `list_projects` |
 | `org_idx` | Y | Organization idx. Obtained through ORG_WORKSPACE_GATE |
 | `workspace_idx` | Y | Workspace idx. Obtained through ORG_WORKSPACE_GATE |
-| `identifier` | N | User identifier `"userId"`\|`"deviceId"` (default `"userId"`). `"deviceId"` is recommended for NU retention |
+| `identifier` | N | Cohort identifier: the name of a dimension present on both `base_event` and `retention_event`, such as `"userId"` or `"deviceId"` (default `"userId"`) |
 | `chart_type` | N | `"table"`\|`"line"` (default `"table"`) |
 | `dimensions` | N | Grouping basis (see below) |
 | `adhoc_filters` | N | Global filters. The same three `filter_type` values as `preview_chart` (index/snapshot/segment) |
@@ -54,7 +54,6 @@ The actual columns and display structure vary with the `chart_type`, `display_fo
 
 - Do not arbitrarily guess the `idx`/`event_name` of `base_event`/`retention_event` (NO_GUESSING).
 - If you need filters or dimensions, confirm them first with `list_dimensions(company_cd, event_name)`.
-- For NU (new user) retention, `identifier="deviceId"` is recommended (identification based on install time is more accurate).
 
 ## On Failure
 

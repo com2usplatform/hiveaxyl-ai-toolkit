@@ -186,4 +186,4 @@ there is a specific reason not to.
 | Detailed activity is too large | Narrow the date and event range from the summary; ask the user to choose a range when the needed scope is unclear |
 | Latest property value is `-` | Report it as not collected, not as zero or absent |
 | Activity and metric disagree | Cross-check settings and time boundaries; leave the cause unconfirmed when it cannot be established |
-| MCP token/Hive session expired (`__AUTH_EXPIRED__`) | Explain that login is required and do not retry without user action |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

@@ -17,7 +17,7 @@ Judgment criteria:
 | Item | Check criterion | Required |
 |------|-----------|------|
 | Game engine | Check ProjectSettings and the Unity project structure | Yes |
-| UPM registration | The com.com2usplatform.hiveaxyl scope and the com.com2usplatform.hiveaxyl.core dependency in Packages/manifest.json, or an equivalent Git package declaration | Yes |
+| UPM registration | The com.com2usplatform.hiveaxyl scope and the com.com2usplatform.hiveaxyl.core dependency in Packages/manifest.json | Yes |
 | Installation resolution | If Packages/packages-lock.json exists, confirm that com.com2usplatform.hiveaxyl.core actually resolved | Conditional |
 | Namespace | Hive.Axyl.Core and Hive.Axyl.Core.Unity types imported or used with fully qualified names | Yes |
 | App ID | A non-empty, real Axyl App ID passed to CoreConfig.CreateBuilder | Yes |

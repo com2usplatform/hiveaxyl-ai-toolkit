@@ -26,7 +26,7 @@ description: |
 
 ## Supported Scope
 
-Use only values the Analytics MCP can actually return.
+Use only values the Analytics tools can actually return.
 
 | Target | Query | Automatic rule |
 |---|---|---|
@@ -84,9 +84,11 @@ concurrent users measured as `COUNT_DISTINCT(userId)` of a session heartbeat eve
 Judge `MINUTE` only for a named interval or the latest intervals within at most one hour (30 intervals at a 2-minute
 interval); when the user gives no range, judge only the latest completed interval. When the user asks to find unusual
 intervals over a day or several hours without naming a time, judge `H` first and go down to `MINUTE` only inside the
-flagged hours. When the user names a time window, judge `MINUTE` directly inside it, at most one hour at a time, under
-the scan rule in step 5: a short dip in a distinct-user count can disappear at `H` because most users of the dip are also
-counted in the rest of the hour.
+hours that are `watch` or above, and tell the user that a dip shorter than an hour may not show at `H`, so they can name
+a time window to check by the minute. When the user names a time window, judge `MINUTE` directly inside it, at most
+one hour at a time: a short dip in a distinct-user count can disappear at `H` because most users of the dip are also
+counted in the rest of the hour. Minute intervals inside an hour, whether reached by drilling down or by a named window,
+are judged under the scan rule in step 5.
 
 For retention, query the target cohort and the previous 8 matured cohorts for the same weekday. A Dn value is usable
 only after day n has fully elapsed in KST.
@@ -101,11 +103,13 @@ Judge only completed intervals; a completed interval is treated as fully loaded.
 latest company-level activity timestamp for that event. It is useful activity metadata only and must never be used to
 claim that a target interval is fully loaded.
 
-- An empty or null value, or a zero that would itself be an outlier (`outlier_score <= -3.5` under step 4), is
+- An empty or null value, or a zero that would itself be an outlier (`outlier_score <= -3.5` under step 4, or any zero
+  when the baseline is above 0 and the step-4 scale is 0), is
   `not judged — collection check needed` until the project, date range, metric definition, and related event activity
   have been checked. A zero that is not an outlier, common for a small count, is judged normally, but when the
-  baseline is above 0, always show `no events recorded — check collection` in the user-facing output, whatever the
-  status. Do not silently convert null to zero.
+  baseline is above 0, always show a collection note in the user-facing output, whatever the status:
+  `no events recorded — check collection` for a count, `value is 0 — check collection` for any other metric. Do not
+  silently convert null to zero.
 - Replace missing reference points with older same-position points. Require at least 8 valid references; otherwise return
   `not judged — insufficient reference points`.
 
@@ -147,35 +151,66 @@ to classify it; never pass its tokens to a tool or rebuild the value from them. 
   threshold.
 - For revenue, show the confirmed currency. A comparable registered PU metric may be queried for explanation and for
   `size_variation`, but do not synthesize PU with an unconfirmed fallback definition. If the baseline PU is below 30, PU
-  itself is within the usual range, and revenue is flagged, report `watch` and list a few large payers as the first check.
-- For `D`, when the target is day 1–3 of a month and `abs(outlier_score) >= 3.5`, check for a recurring month-start
-  pattern. The same day of the month falls on different weekdays, so compare lifts, not raw values:
+  itself is within the usual range, and revenue is `watch` or above, report `watch` and list a few large payers as the
+  first check.
+- For a count or revenue metric at `D` or `H`, when the target falls on day 1–3 of a month, compare it with the
+  recurring month-start pattern, whatever its first status. Skip the comparison for other metrics and when the target's
+  own baseline is 0 or below. The same day of the month falls on different weekdays, so compare lifts, not raw values:
 
   ```text
-  lift(day) = value(day) / median(same weekday in the 8 weeks before that day)
+  lift(day) = value(day) / median(same weekday, and same hour for H, in the 8 weeks before that day)
   ```
 
-  Compute the lift of the same day of the month in each of the previous 8 months, and the target lift
-  (`target / baseline`). Apply the outlier rule to the target lift against those 8 lifts with `size_variation = 0`.
-  If it is within the usual range, report `normal` with the note `recurring month-start pattern`. Keep the status when
-  fewer than 8 lifts are available (a zero weekday median gives no lift), or when the lifts have zero variation, and
-  note that the month-start pattern could not be checked. One `D` query covering about 10 months supplies every value (split it if the range is rejected).
-  Such a pattern can come from monthly pass renewals, paydays, or monthly spending-limit resets; do not assume which.
-  This comparison only lowers a status and never raises one.
+  1. Take the same day of the month (and hour) in each of the previous 8 months. Replace a month with an older one
+     when the reference day, the day a week before, or the day a week after is a known exclusion (step 3), or when the
+     reference day's weekday median is 0 or below; with fewer than 8, keep the status.
+  2. Count the pattern months. Measure each reference day's deviation from its own weekday median in units of its own
+     step-4 scale (for revenue, with the target's baseline PU). Measure the same weekday one week before and one week
+     after it the same way, and take the mean of those two as its comparison deviation; a steady growth or decline moves
+     the reference day and its comparison alike and cancels out, and a month-start event that runs longer than a week
+     still differs from the week before. When a day's scale is 0, its deviation is a large value in the sign of its
+     difference (0 when there is no difference); this applies wherever a day's deviation is used below. The pattern direction is above the
+     weekday median when the median of the reference deviations is positive and below it when negative; a median of
+     exactly 0 means no pattern. A reference month is a pattern month when, in the pattern direction, its deviation is
+     at least 1 and its deviation minus its comparison deviation is also at least 1; a reference day whose own scale is
+     0 and that differs in the pattern direction passes both tests. With fewer than 6 pattern months the pattern is not
+     established: keep the status. A pattern that began 4 months ago is rarely established; one that began 5 months ago
+     is established about a third of the time.
+     Compute this with code when available. Otherwise lay out one row per reference month (day value, weekday median,
+     scale, deviation, comparison deviation, difference, pattern month yes/no) before deciding.
+  3. Judge the target lift (`target / baseline`) against the 8 reference lifts with the step-4 rule and the single-check
+     threshold 3.5, even inside a scan. Their `size_variation` is `sqrt(max(baseline × median lift, 1)) / baseline` for a
+     count and `median lift / sqrt(max(baseline PU, 1))` for revenue, otherwise 0. When their scale is 0, an identical
+     target lift is within the usual range and any other lift is not.
+  4. If the first status is `watch` or above and the target lift is within the usual range, report `normal` with the
+     note `recurring month-start pattern`. If the first status is `normal` but the pattern is established and the target
+     lift is outside the usual range, report `watch` with the note `usual month-start pattern missing`: the value looks
+     ordinary only because the month-start rise did not happen. Otherwise keep the status and say whether the
+     month-start pattern could be checked.
+
+  One query covering about 12 months at the target's time unit supplies every value (query further back when months
+  are replaced, and split it if the range is rejected); for `H`, keep only the target hour. Such a pattern can come
+  from monthly pass renewals, paydays, or monthly spending-limit resets; do not assume which. This comparison moves a
+  status only as item 4 above says: down to `normal`, or up to `watch` at most.
 - For additive monthly metrics such as revenue or event count, compare monthly totals divided by calendar days when month
   lengths differ, and display both the normalized value and the raw total. For a normalized count, take `size_variation`
   from the raw total, not from the per-day value: `sqrt(max(baseline × days, 1)) / days`, where `days` is the target
   month's calendar days. Do not divide monthly unique users; query MAU with `period="M"`. When the target month differs
-  from the median reference month by 2 or more calendar days (February), a flagged monthly unique-user count is at
-  most `watch`, with a month-length note.
+  from the median reference month by 2 or more calendar days (February), month length alone can move the value
+  between the baseline and the prorated baseline (`baseline × target days / median reference days`). If a monthly
+  unique-user count that is `watch` or above lies in that range, widened by `3.5 × scale` on each side, report at most
+  `watch` with a month-length note that a drop of up to that size can be hidden by the shorter month; a change beyond
+  it keeps its status.
 
-Assign one status:
+Assign one status from the score, then apply the adjustments above in this order: the `watch` caps (minimum business
+effect, small PU revenue, February monthly unique users), then the month-start comparison. Each result has exactly one
+status:
 
 | Signal status | Rule |
 |---|---|
-| `statistical outlier` | At least 8 valid references, `abs(outlier_score) >= 3.5` (7 in a scan), and any user-provided minimum effect also passes |
-| `watch` | The outlier rule passes but a business effect does not; both variations are 0 with a changed target; a scan check has `3.5 <= abs(outlier_score) < 7`; revenue is flagged with a small, usual PU; or a monthly unique-user count is flagged in a month of a different length |
-| `normal` | At least 8 valid references and `abs(outlier_score) < 3.5`, or a recurring month-start pattern |
+| `statistical outlier` | At least 8 valid references and `abs(outlier_score) >= 3.5` (7 in a scan), with no `watch` cap and no month-start lowering |
+| `watch` | A `watch` cap applies; both variations are 0 with a changed target; a scan check has `3.5 <= abs(outlier_score) < 7`; or the usual month-start pattern is missing — in each case with no month-start lowering |
+| `normal` | At least 8 valid references and `abs(outlier_score) < 3.5` with no month-start raising, or a recurring month-start pattern |
 | `not judged` | Unsupported definition, missing data, immature retention, or fewer than 8 references |
 
 A statistical outlier does not become a confirmed business incident.
@@ -187,9 +222,10 @@ metric-interval checks:
 
 - require `abs(outlier_score) >= 7` for `statistical outlier`; `3.5 <= abs(outlier_score) < 7` is `watch`;
 - sort by status, then by `abs(outlier_score)`, and describe only the top 5 in detail;
-- if more than 4 metrics of the same project flag in the same target interval, list a data-collection check first.
+- if more than 4 metrics of the same project are `watch` or above in the same target interval, list a data-collection
+  check first.
 
-Do not explain chance or probability to the user; the status labels carry the result.
+Do not state probabilities or false-alarm rates to the user; the status labels carry the result.
 
 ### 6. Retention rule
 
@@ -202,9 +238,15 @@ usual_variation = median(abs(reference_retention_percent - baseline))
 p               = baseline / 100
 v_ref           = 10000 × p(1 - p) / median(reference cohort size)
 v_target        = 10000 × p(1 - p) / target cohort size
-scale           = sqrt(max((usual_variation / 0.6745)², v_ref) + max(0, v_target - v_ref))
+scale           = sqrt(max((usual_variation / 0.6745)², v_ref, (resolution / sqrt(6))²) + max(0, v_target - v_ref))
 outlier_score   = (target_retention_percent - baseline) / scale
 ```
+
+`resolution` is the rounding step of the returned percentages: 1 for whole percents (about 0.41 after `/ sqrt(6)`),
+0.1 for one decimal place, 0.01 for two, 0 when they are not rounded; use the coarser step when the target and the references
+differ. Rounded reference percentages can show no variation even when the true rate moves; this floor keeps a
+difference smaller than the rounding error from becoming a signal. When a retention result is `normal` but the relative
+change is 20% or more, apply the output rule below with `3.5 × sqrt(v_target)` in place of `3.5 × size_variation`.
 
 Require the target and each included reference cohort to contain at least 100 users, replacing smaller references with
 older same-weekday cohorts. Require 8 valid references. If cohort size is absent from the response, return `not judged`.
@@ -260,21 +302,33 @@ Analysis basis (reference): 8 comparable Mondays · typical level 9,800 USD · n
 
 Adapt `What it means` and `Check first` to the confirmed metric definition. Do not invent business impact or a cause.
 If the status is normal, omit the cause checklist unless the user asks. If it is pending data, lead with what is missing
-and what would make the check possible. For a recurring month-start pattern, say that the rise over the usual weekday
-level matches the same day of recent months. When `size_variation` sets the scale, add `small volume, so chance variation was allowed for` to the
-analysis basis.
+and what would make the check possible. For a recurring month-start pattern, say that the change from the usual weekday
+level matches the same day of recent months; that note replaces the explanation below. For `usual month-start pattern
+missing`, state in `What changed` the expected month-start level (`baseline × median reference lift`) and the change
+against it, use that change in the `Change vs usual` column, and list the monthly renewal, payment, or reset schedule as
+the first check. For a recurring month-start row, measure the change against the expected month-start level
+(`baseline × median reference lift`), not against the usual weekday level, when deciding whether it changed 20% or
+more, and give `recurring month-start pattern` as its reason. When a result is `normal` but
+the change is 20% or more, say why in `What it means`: a small volume when the change is smaller than
+`3.5 × size_variation`, otherwise the metric's usual swing. For example: `The change is large, but at this small volume
+changes this size happen without a specific cause.`
 
 For several metrics, start with one line of counts and a compact action table sorted as in step 5, then explain only
 `Needs attention` and `Monitor` rows:
 
 ```text
 Checked 12 metrics for 2026-09-28: 1 needs attention, 1 to monitor, 10 within usual range.
+Within usual range but changed 20% or more: Tutorial completions (-24%, small volume).
 ```
+
+List the `Within usual range` rows that changed 20% or more on that second line with their reasons, up to 5 by size of
+change, and summarize the rest as `N more metrics moved 20% or more within their usual range`, so a large normal change
+is never silent. For retention, show both forms, for example `-8.0%p (-20% relative)`.
 
 | Status | Metric | Target interval | Change vs usual | Check first | Basis |
 |---|---|---|---|---|---|
 | Needs attention | Daily revenue | 2026-09-28 | +36.9% | Promotion/payment schedule | 8 Mondays |
-| Monitor | D1 retention | 2026-09-27 cohort | -1.8%p | Cohort mix/acquisition source | 8 Sundays · cohort 1,240 users |
+| Monitor | D1 retention | 2026-09-27 cohort | -6.2%p (-15.5% relative) | Cohort mix/acquisition source | 8 Sundays · cohort 1,240 users |
 
 Put reference dates, typical level, exclusions, cohort sizes, and optional business thresholds under
 `Analysis basis (reference)` after the action-oriented summary. Show the technical MAD and outlier score only when the

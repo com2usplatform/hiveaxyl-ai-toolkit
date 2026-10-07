@@ -243,4 +243,4 @@ Check that snapshot's job_status with list_segment_snapshots.
 | No condition labels | The property metadata query failed. Explain with the raw condition values, or interpret them yourself with `list_segment_meta` |
 | `segment_idx` company mismatch | It is another company's segment. Reconfirm with `list_segment_snapshots` |
 | Deleted segment | A snapshot cannot be created. Propose creating a new one with `create_segment` |
-| MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Explain that the user must sign in again. Cannot retry without user action |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |
