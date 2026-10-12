@@ -54,7 +54,7 @@ Axyl records the top-level columns `appId` and `userId`, plus `deviceId`, `aud`,
 pipeline adds `_dataSource`, `_geoIpCountry`, `_clientIp` (last octet masked to 0), `_market`, and `_os` on top. When the definition requires `os`, `lang`, or `country`, record which
 the user chose: the hiveAttributes value, or a direct send from the game into eventAttributes.
 For v4, write this based on the
-auto-collected properties in the [SDK v4 flow](../references/flow_sdk_v4.md). Do not duplicate auto-collected properties in the event
+auto-collected properties in the SDK v4 flow <!-- references/flow_sdk_v4.md of axyl-integrate-analytics-log -->. Do not duplicate auto-collected properties in the event
 payload examples.
 
 ## Event Details

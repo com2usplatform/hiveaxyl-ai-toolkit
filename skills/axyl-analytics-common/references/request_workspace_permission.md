@@ -16,12 +16,13 @@ Files a request for access to a workspace the caller has no permission for. The 
 |---------|------|------|
 | `company_cd` | Y | Company code confirmed from `list_projects` |
 | `org_idx` | Y | Organization idx confirmed from `list_organizations` |
-| `workspace_idx` | Y | The idx of the workspace to request access to |
+| `workspace_idx` | Y | The workspace to request access to. A non-administrator's `list_workspaces` does not show workspaces they do not belong to, so take it from a denied call, from the workspace of a `list_contents` row, or (for an Analytics administrator) from `list_workspaces`. If none has it, ask the user to request access in the console — never guess it |
 
 ## Return Value
 
 Returns `request_idx`, `workspace_idx`, `workspace_name`, `org_idx`, `approval_status` (`PENDING`), and `console_url`
-(the screen for checking how the request is being handled).
+(the screen for checking how the request is being handled). `request_idx` can be null when the request could not be
+identified in the response; the request may still have been filed.
 
 ## Decision Rules
 
@@ -39,9 +40,17 @@ Returns `request_idx`, `workspace_idx`, `workspace_name`, `org_idx`, `approval_s
 ## On Failure
 
 - Already has access: no request is needed. Proceed with that workspace.
-- Pending request exists: report the request `idx` from the error message along with `console_url`.
-- Not an active workspace: it is hidden or deleted, and approving would lead nowhere. Recheck the target with `list_workspaces`.
-- Organization access error: recheck the accessible organizations with `list_organizations`.
+- Pending request exists: report that a request is already pending; do not file again.
+- Not an active workspace of this organization: it may be hidden or deleted, or it may **belong to another organization**.
+  Call `get_workspace_details(company_cd, org_idx, workspace_idx)` (it needs only organization access, not membership): a
+  not-found error means it is deleted; an ownership error names the owning organization, so confirm that organization
+  through ORG_WORKSPACE_GATE and request again there. Do not use `list_workspaces` for this — it lists only workspaces you
+  already belong to.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- API error, or the session expired during the call: the request may have been filed. Do not retry automatically; with
+  fresh WRITE_APPROVAL (say that nothing changed), calling again cannot file a duplicate — the server blocks it while a request is pending, and that
+  block confirms the first request went through.
 
 ## Recommended Chain
 

@@ -146,13 +146,13 @@ Current handling of Axyl's required properties:
 |------|------|
 | userId | Auto-collected by the gateway from X-Hive-Player-Id. Do not set `ClientLogEvent.UserId` |
 | deviceId | The game passes the app's DeviceKey directly in `ClientLogEvent.DeviceId`. Always sent, regardless of auth state |
-| identifierProvider | The server always overwrites it with `hive`. Do not set `ClientLogEvent.IdentifierProvider` |
+| identifierProvider | The game sets `ClientLogEvent.IdentifierProvider` to `"hive"` |
 | appId | The SDK passes the CoreConfig initialization value automatically with every request (X-App-Id), and it is auto-collected at the receiving stage |
 | eventTime | The game passes the event occurrence time directly in `ClientLogEvent.EventTime` as a `DateTimeOffset`. The SDK converts it to an RFC 3339 string including the UTC offset |
 | eventName | The game passes the name from the event definition in `ClientLogEvent.EventName` |
 
-There are three required properties the game puts in itself: deviceId, eventTime, and eventName.
-userId, appId, and identifierProvider are filled by the SDK, the gateway, and the server, so the game does not set them.
+There are four required properties the game puts in itself: deviceId, eventTime, eventName, and identifierProvider (`"hive"`).
+userId and appId are filled by the gateway and the SDK, so the game does not set them.
 
 ### Handling a missing required property
 
@@ -164,7 +164,7 @@ cannot be obtained, do not omit the property — fill it with `"0"` or `"unknown
   If `EventTime` is not set, the SDK raises no error and sends the `DateTimeOffset` default
   `0001-01-01T00:00:00.0000000+00:00` as is, so always set it. Even when events are collected and sent later, put in the
   occurrence time, not the send time.
-- The server always overwrites identifierProvider with `hive`, so the game does not set it.
+- Always set identifierProvider to `"hive"`.
 - Obtain deviceId through the DeviceKey rules below. Use `"0"` or `"unknown"` only when it cannot be obtained.
 - This rule applies to required properties only. For event properties, do not insert an arbitrary fallback when the value
   is unknown — leave them with the value source unconnected. An empty event property is not a quarantine reason.
@@ -253,7 +253,7 @@ per category. Do not repeat unnecessary approval questions per category.
 
 Map properties in this order.
 
-1. The Axyl required properties the game sends directly (deviceId, eventTime, eventName)
+1. The Axyl required properties the game sends directly (deviceId, eventTime, eventName, identifierProvider = `"hive"`)
 2. The common context enrichment properties
 3. The event properties confirmed from get_event_spec
 4. Items whose value source is unconfirmed
@@ -325,7 +325,7 @@ Generation rules:
   `IAnalyticsService.CollectClientLogAsync()`. Several events can be batched into one request.
 - `ClientLogEvent` fields: `EventTime` (`DateTimeOffset`, required), `EventName` (required), `DeviceId`, `UserId`,
   `IdentifierProvider`, and `AdditionalProperties` (`IDictionary<string, string>`).
-- Do not set `UserId` or `IdentifierProvider`. The SDK passes appId automatically with every request, so do not put it in the request.
+- Do not set `UserId`. Set `IdentifierProvider` to `"hive"`. The SDK passes appId automatically with every request, so do not put it in the request.
   Do not build a branch that conditionally inserts userId based on login state. Call it the same way before and after login; when a
   session is active, the SDK includes the auth token automatically.
 - Put `DateTimeOffset.Now` at the moment the event occurs in `EventTime`. Do not format it into a string yourself.
@@ -380,6 +380,7 @@ Structure example:
             EventTime = eventTime,            // event occurrence time
             EventName = eventName,
             DeviceId  = string.IsNullOrEmpty(deviceId) ? "unknown" : deviceId,
+            IdentifierProvider = "hive",
             AdditionalProperties = properties,
         };
     }
@@ -405,7 +406,7 @@ Structure example:
     }
 
 This example shows the structure of the required properties the game puts in itself and of the send result handling. The absence
-of userId, appId, and identifierProvider is deliberate. Implement `JsonString` with the repository's existing JSON serialization; if
+of userId and appId is deliberate. Implement `JsonString` with the repository's existing JSON serialization; if
 there is none, create one helper that follows the escaping rules. Connect deviceId to the actual value source confirmed in the
 repository. The deviceId fallback exists to keep the whole log from being quarantined when the value could not be obtained; it does
 not mean you may skip looking for the source. If the installed SDK version's types or signatures differ from the above, the
@@ -440,11 +441,11 @@ location — report it as an unconfirmed item.
 
 - Perform the Unity compile or whatever static checks are possible.
 - Confirm that the using/import statements and the types used exist in the actual project.
-- Confirm that the 3 directly sent required properties (deviceId, eventTime, eventName) are in `ClientLogEvent` fields, and that
+- Confirm that the 4 directly sent required properties (deviceId, eventTime, eventName, identifierProvider) are in `ClientLogEvent` fields, and that
   guid and the event properties are placed flat in `AdditionalProperties`.
 - Confirm that deviceId, eventTime, and eventName are neither missing nor empty. In particular, confirm that `EventTime` is set on
   every construction path so that the `0001-01-01` default is never sent.
-- Confirm that `UserId` and `IdentifierProvider` are not set and that appId and appIdGroup are not put in the request.
+- Confirm that `UserId` is not set, that `IdentifierProvider` is `"hive"`, and that appId and appIdGroup are not put in the request.
 - Confirm that every `AdditionalProperties` value is a valid JSON value string (strings quoted and escaped).
 - Confirm that no `AdditionalProperties` key is `eventTime`, `eventName`, `deviceId`, `userId`, or `identifierProvider`.
 - Confirm that the Analytics module (`com.com2usplatform.hiveaxyl.analytics`) is installed and that `AddAnalytics()` is registered

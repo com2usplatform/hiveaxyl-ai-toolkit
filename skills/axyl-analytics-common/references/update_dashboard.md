@@ -25,18 +25,20 @@ Updates a saved dashboard's name, description, member content, or global period 
 | `dashboard_desc` | N | New description |
 | `contents` | N | New content list (in display order, one or more) |
 | `date_params` | N | New global period |
-| `adhoc_filters` | N | New global filters. Passing `[]` removes them |
+| `adhoc_filters` | N | New global filters (applied to every member by dimension name; confirm every member's event has it). Passing `[]` removes them |
 
 Each `contents` entry:
 
 | Key | Required | Description |
 |----|------|------|
-| `content_idx` | Y | Content idx in the same workspace |
-| `content_type` | Y | `chart`, `chart_rank`, `funnel`, `retention` |
+| `content_idx` | Y (content panel) | Content idx in the same workspace |
+| `content_type` | Y (content panel) | `chart`, `chart_rank`, `funnel`, `retention` |
 | `chart_type` | N | Used only to decide the default size |
 | `width` | N | Width on the 24-column grid. Defaults per type |
 | `height` | N | Height. Defaults per type |
 | `memo` | N | Panel memo. **Omit to keep the existing memo**, `""` to delete it |
+| `row` | N | Row number from `get_dashboard`. A new row starts where the value changes |
+| `panel_ref` | Y (text/image panel) | Panel number returned by `get_dashboard`. Such an entry has no `content_idx`/`content_type` |
 
 **At least one** field to change is required.
 
@@ -49,9 +51,21 @@ global settings, memos — is preserved.
 ## Passing contents Recalculates the Layout
 
 To add or remove one content, check the current configuration with `get_dashboard` and pass the
-**complete new list** in display order. **Carry over the `width` and `height` that
-`get_dashboard` returned to keep the existing layout.** Omit them and each panel falls back to
-its per-type default size, so sizes hand-tuned in the console revert.
+**complete new list** in display order. **Carry over the `width`, `height`, and `row` that
+`get_dashboard` returned to keep the existing layout.** Omit the sizes and each panel falls back to
+its per-type default size, so sizes hand-tuned in the console revert. Omit `row` and entries fill one row until the
+24 columns are used, so rows that were separate may merge.
+
+## Text and Image Panels Are Not Deleted
+
+This tool cannot create text or image panels or change their content, but rebuilding `contents` does not remove them either.
+
+- To place a panel, put `{"panel_ref": n}` with the `panel_ref` from `get_dashboard` at that position (add `width`,
+  `height`, and `row` to keep the original layout). The stored panel content is carried over as is.
+- A panel not included in `contents` is **appended at the bottom with its original size and row grouping.**
+- `panel_ref` numbers panels in display order (top to bottom, left to right). After moving panels, read the dashboard
+  again with `get_dashboard` and use the new numbers before the next update.
+- Delete a panel or change its content in the console.
 
 Do not pass `contents` when you are only changing the name, description, or global settings.
 
@@ -67,7 +81,7 @@ whenever an entry does not specify `memo`.** Pass `memo=""` to delete one.
 (separate from each content's own period and filters).
 
 For a fixed global period, write the dates as **date only, like `"2026-09-11"`** — unlike a
-content's `date_params`, which uses `"2026-09-11 00:00:00"`.
+content's `date_params`, which uses `"2026-09-11 00:00:00"`. A time part is cut to the date.
 
 ## Return Value
 
@@ -100,7 +114,10 @@ Set them in the console.
 | A content in `contents` belongs to another workspace | Only content in the same workspace can be attached |
 | `content_type` does not match the stored type | Confirm the real type with `list_contents` / `get_content` |
 | `width` greater than 24 | The grid is 24 columns |
-| Dashboard created by someone else | A workspace member can only edit **what they created**. If the save is rejected, ask the user whether to make a copy or request the change from the author |
+| `panel_ref` out of range or used twice | Read the dashboard again with `get_dashboard` and check the panel numbers |
+| Trying to add a new text or image panel | Not supported. Add it in the console |
+| API error or session expiry | Do not retry automatically; check with `get_dashboard` whether it took effect |
+| Dashboard created by someone else | Only a dashboard whose `get_dashboard` `permission` is `EDITOR` can be changed. Check it before saving any new content for the dashboard; otherwise ask the user whether to make a copy or request the change from the author |
 
 ## Recommended Chain
 

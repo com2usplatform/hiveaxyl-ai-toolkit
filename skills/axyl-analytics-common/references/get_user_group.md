@@ -18,7 +18,7 @@ group with `list_user_groups`.
 | `org_idx` | Y | Organization idx confirmed from `list_organizations` |
 | `appid_group` | Y | Project ID (`list_projects.appid_group`) |
 | `group_id` | Y | User group idx (`list_user_groups.idx`) |
-| `limit` | N | Number of users to return. Default 20; the server returns up to 100 |
+| `limit` | N | Number of users to return. Default 20; the server returns up to 100. 0 or less returns every row the server gave |
 | `lang` | N | Label language. Default `ko` |
 | `order_name` | N | Sort field (for example `userId`, `accKrw`) |
 | `order_type` | N | Sort direction (`desc` or `asc`) |
@@ -51,7 +51,9 @@ Members carry `userId` together with user properties, with labels applied.
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (a positive `group_id`) and call again.
 - Empty result: the group has no members. For a segment-type group, check the source segment.
 
 ## Recommended Chain

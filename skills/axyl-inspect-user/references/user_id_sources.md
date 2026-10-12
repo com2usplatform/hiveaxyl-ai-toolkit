@@ -88,11 +88,13 @@ Listing bare numeric IDs leaves the user unable to choose. **Do not present cand
 2. If not, one has to be created. The flow is heavy, so **propose it to the user and proceed only after approval**
 
 ```text
-Create a segment with axyl-create-segment (WRITE_APPROVAL)
-  → extract a snapshot
-  → regist_user_group(company_cd, org_idx, appid_group, game_name, name, segment_id, segment_snapshot_id)
+[WRITE_APPROVAL] → create a segment with axyl-create-segment
+  → [WRITE_APPROVAL] → extract a snapshot
+  → [WRITE_APPROVAL] → regist_user_group(company_cd, org_idx, appid_group, game_name, name, segment_id, segment_snapshot_id)
   → get_user_group → present candidates
 ```
+
+Obtain WRITE_APPROVAL before each write; approval of one step does not cover the next.
 
 `regist_user_group` **cannot be undone** — no group deletion tool is provided. Before calling it,
 check with `list_user_groups` that no group for the same purpose exists, and confirm the name with the user.

@@ -25,12 +25,12 @@ Updates a saved chart (`content_type='chart'`). **This is a write.**
 | `chart_type` | N | New chart type (`table`, `line`, `pie`, `scorecard`, ...) |
 | `date_params` | N | New period. Same format as `preview_chart` |
 | `event_measures` | N | New measure list. Same format as `preview_chart` |
-| `dimensions` | N | New dimension list |
+| `dimensions` | N | New dimension list. Buckets follow the "Dimension buckets" section of `preview_chart` |
 | `adhoc_filters` | N | New filter list |
-| `pivot_col_ids` | N | Table pivot columns. Only with `chart_type='table'` |
-| `row_group_col_ids` | N | Table row group columns. Same restriction |
+| `pivot_col_ids` | N | Table pivot columns. Only with `chart_type='table'`. Omit to keep, `[]` to clear |
+| `row_group_col_ids` | N | Table row group columns. Same restriction. Omit to keep, `[]` to clear |
 | `aggregation` | N | Table aggregation `{col_id: agg_func}`. Same restriction |
-| `hidden_col_ids` | N | Table hidden columns. Same restriction |
+| `hidden_col_ids` | N | Table hidden columns. Same restriction. Omit to keep, `[]` to clear |
 
 **At least one** field to change is required.
 
@@ -72,7 +72,7 @@ are all **display names** — `alias` for measures, `name_alias` (or `name` if o
 dimensions, and `dateTime` for the date axis.
 
 So **changing a measure's `alias` or a dimension breaks any table setting that referenced the old
-name.** Pass the matching grid argument along with the change; if you do not, the call is
+name.** Pass the matching grid argument along with the change (`[]` clears a pivot, row group, or hidden-column setting that is no longer needed); if you do not, the call is
 rejected before saving (the error lists what broke and which columns are available).
 
 ## On Failure
@@ -81,10 +81,11 @@ rejected before saving (the error lists what broke and which columns are availab
 |------|------|
 | No field to change was passed | Ask the user which field to change |
 | Wrong content type | Use `update_chart_rank`, `update_funnel`, or `update_retention` |
-| Table setting points at a missing column | Read the column list in the error and pass the grid argument too |
+| Table setting points at a missing column | Read the column list in the error and pass the grid argument too, after fresh WRITE_APPROVAL (say what changed) |
 | Project outside the organization's scope | Only projects the organization can access are allowed. Check with `list_projects(company_cd, org_idx)` |
 | Grid argument passed for a non-table chart | Only available with `chart_type='table'` |
 | Content created by someone else | A workspace member can only edit **content they created**. If `get_content.permission` is not `EDITOR` the save is rejected — ask the user whether to make a copy or request the change from the author |
+| API error or session expiry | Do not retry automatically; check with `get_content` whether it took effect |
 
 ## Recommended Chain
 

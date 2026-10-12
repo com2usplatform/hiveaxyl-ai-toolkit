@@ -1,6 +1,6 @@
 # create_chart (Save Chart Content)
 
-> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + **WRITE_APPROVAL** are required.
+> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + DUPLICATE_GATE + **WRITE_APPROVAL** are required.
 
 ## When to Use
 
@@ -41,12 +41,14 @@ Returns the saved content ID, type, name, and Analytics console URL.
 ## On Failure
 
 - Parameter or schema error: correct the corresponding `preview_chart` configuration and preview again.
-- Permission or workspace error: repeat ORG_WORKSPACE_GATE and do not retry with a guessed identifier.
-- Save API error: report the server response and do not automatically retry, because the first request may have succeeded.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Save API error, or the session expired during the call: report the server response and do not automatically retry, because
+  the first request may have succeeded. Check with `list_contents` whether it was created before calling again. Use DUPLICATE_GATE's exact name/type recovery query (never `mine_only`; `limit=0` is allowed). An item that existed before the save does not count. Call again only after fresh WRITE_APPROVAL.
 
 ## Recommended Chain
 
 ```
 (PROJECT_ID_GATE) → (SCHEMA_FIRST: list_metrics or list_events/list_dimensions)
-→ (ORG_WORKSPACE_GATE) → preview_chart (validation) → [WRITE_APPROVAL] → create_chart
+→ (ORG_WORKSPACE_GATE) → preview_chart (validation) → (DUPLICATE_GATE) → [WRITE_APPROVAL] → create_chart
 ```

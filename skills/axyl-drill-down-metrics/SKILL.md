@@ -3,17 +3,17 @@ name: axyl-drill-down-metrics
 metadata:
   version: "1.0.0"
 description: |
-  Breaks revenue and DAU down by dimension through preview_chart and ranks users through preview_chart_rank. "Segment breakdown"
-  here means querying a metric split by dimension (OS, country, market) — not defining or saving a segment, which is
-  axyl-create-segment.
+  Breaks Hive Analytics metrics down by dimensions through preview_chart and ranks users through preview_chart_rank.
+  This is read-only contributor analysis, not defining or saving a user segment. Follow axyl-analytics-common first.
 
   TRIGGER when:
-  - The user asks for a revenue or DAU breakdown by OS, country, market, or product
-  - The user asks for a segment analysis to find the cause of a revenue spike or drop
+  - The user asks to break down any metric by OS, country, market, product, or another confirmed dimension
+  - The user asks which segments contributed to an already identified metric spike or drop
   - The user asks for a list of whale users or top-paying users
 
   DO NOT TRIGGER when:
-  - The request is a simple DAU or revenue figure lookup → use preview_chart directly
+  - The request asks whether a change is anomalous or scans metrics for anomalies → use axyl-detect-anomaly
+  - The request is a simple metric figure lookup → use axyl-analytics-common (preview_chart)
   - The request investigates one specific user's activity, purchases, or logins → use axyl-inspect-user
   - The request is to create and save a segment or take a snapshot → axyl-create-segment
   - The request is development work unrelated to analytics
@@ -33,6 +33,7 @@ description: |
 ### Segment breakdown
 - [Dimension breakdown](references/dimension_breakdown.md) — use `preview_chart` with `dimensions` to break down by OS, country, market, and so on. Applies to any metric, not just DAU and revenue
 - [User ranking](references/user_ranking.md) — use `preview_chart_rank` to aggregate and rank by userId. Ranking works with any metric, including payment amount and login count
+- **Tool contracts:** [preview_chart](../axyl-analytics-common/references/preview_chart.md) / [preview_chart_rank](../axyl-analytics-common/references/preview_chart_rank.md)
 
 ---
 
@@ -40,7 +41,8 @@ description: |
 
 ### Prerequisite — Review the common rules
 
-PROJECT_ID_GATE, ORG_WORKSPACE_GATE, SCHEMA_FIRST, and NO_GUESSING from axyl-analytics-common apply.
+PROJECT_ID_GATE, ORG_WORKSPACE_GATE, SCHEMA_FIRST, and NO_GUESSING from axyl-analytics-common apply. EXISTING_ASSET_FIRST
+does not apply; Step 1-0 matches the company definition through metric mode. But when the user names a saved chart or dashboard, follow the named-asset rule under EXISTING_ASSET_FIRST in [Query preparation](../axyl-analytics-common/references/query_preparation.md) (its filters and a named dashboard's global filters are kept); for a named dashboard, use its global period as the query period unless the user gave one.
 If project_id and company_cd have not been confirmed, perform PROJECT_ID_GATE first; if org_idx and workspace_idx have
 not been confirmed, perform ORG_WORKSPACE_GATE first.
 
@@ -64,7 +66,8 @@ Step 1-2. Call list_dimensions(company_cd, event_name)
   → note the name and idx to use in dimensions or adhoc_filters
   → can be skipped if the dimension information has already been confirmed
 
-Step 1-3. ORG_WORKSPACE_GATE (check_analytics_admin → list_organizations → list_workspaces)
+Step 1-3. ORG_WORKSPACE_GATE (check_analytics_admin → list_organizations → list_projects(company_cd, org_idx) →
+          list_workspaces; steps already done by PROJECT_ID_GATE are reused)
   → obtain the org_idx/workspace_idx that preview_chart and preview_chart_rank require
   → can be skipped if the values have already been confirmed
 ```
@@ -91,7 +94,7 @@ Step 3. If the ranking result requires investigating one user's activity, purcha
 
 The full drill-down chain:
 ```
-list_events → list_dimensions (verify the schema) → (ORG_WORKSPACE_GATE)
+list_metrics → list_events → list_dimensions (verify the schema) → (ORG_WORKSPACE_GATE)
   └─ preview_chart (dimension breakdown)        ← Phase 2
        └─ preview_chart_rank (user ranking)     ← Phase 2
             └─ decide whether to hand off to axyl-inspect-user ← Phase 3
@@ -107,7 +110,7 @@ list_events → list_dimensions (verify the schema) → (ORG_WORKSPACE_GATE)
 | org_idx/workspace_idx unconfirmed | Calling preview_chart or preview_chart_rank with an arbitrary value (for example, 0) | Perform ORG_WORKSPACE_GATE, then retry |
 | Specific-user investigation needed | Querying individual history in this skill | Pass the selected user_id and project scope to axyl-inspect-user |
 | Dimension unclear | Guessing and passing it | Confirm with `list_dimensions`, then pass it |
-| Displaying revenue | Showing only the number | Always display the currency basis alongside |
+| Displaying revenue | Showing only the number | Always display the currency basis alongside; when its event has no `is_currency=1` dimension, state that the amounts are not converted instead |
 | Single dimension breakdown result | Declaring "the cause is X" | Express it as "the segment with the largest impact is X, and the hypothesis to check is Y" |
 
 ---
@@ -118,4 +121,5 @@ list_events → list_dimensions (verify the schema) → (ORG_WORKSPACE_GATE)
 |------|------|
 | Dimension name error | Select the correct dimension_name from the list_dimensions result, then retry |
 | Empty user ranking result | Explain that no user generated that metric in that period. Suggest widening the date range |
-| Organization or workspace authorization error | Perform ORG_WORKSPACE_GATE again. Recheck accessible values with `list_organizations`/`list_workspaces` |
+| Organization or workspace authorization denial | Do not retry the same call unchanged or with a guessed identifier; follow MCP_ACCESS_GATE (denied call with `org_idx`) |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

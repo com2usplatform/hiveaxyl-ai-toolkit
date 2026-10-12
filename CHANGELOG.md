@@ -2,6 +2,13 @@
 
 Notable changes to Hive Axyl AI Toolkit. This project follows [Semantic Versioning](https://semver.org/), and public releases are tagged `vMAJOR.MINOR.PATCH`.
 
+## 2.1.0 : 2026-10-12
+
+### Changed
+
+- Analytics MCP access now requires MCP-specific permission.
+- Updated Analytics and TCB skill guidance and improved MCP authentication and error handling.
+
 ## 2.0.0 : 2026-10-07
 
 ### Changed

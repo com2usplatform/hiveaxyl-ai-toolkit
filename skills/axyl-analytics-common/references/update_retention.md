@@ -50,7 +50,7 @@ event saves without error, but the grouping never takes effect in the console.
 
 So this tool **checks that dimensions belong to the base event before saving and blocks them if
 not.** The error lists every dimension of the base event as `name(idx)`, so pick from it and
-call again.
+call again after fresh WRITE_APPROVAL (say what changed or that nothing did).
 
 **When you change `base_event`, look up `dimensions` again on the new base event and pass them
 together.** Changing only the base event leaves the existing dimensions outside the new event,
@@ -75,10 +75,11 @@ Same shape as `update_chart`, with `content_type` of `"retention"`.
 
 | Symptom | What to do |
 |------|------|
-| Dimension does not belong to the base event | Pick from the dimension list in the error and call again |
-| Changed only `base_event`, leaving dimensions mismatched | Pass `dimensions` looked up on the new base event |
+| Dimension does not belong to the base event | Pick from the dimension list in the error and call again after fresh WRITE_APPROVAL |
+| Changed only `base_event`, leaving dimensions mismatched | Pass `dimensions` looked up on the new base event, after fresh WRITE_APPROVAL (say what changed) |
 | `base_event` / `retention_event` missing `event_name` | Both `idx` and `event_name` are required |
 | Project outside the organization's scope | Check with `list_projects(company_cd, org_idx)` |
+| API error or session expiry | Do not retry automatically; check with `get_content` whether it took effect |
 | Content created by someone else | A workspace member can only edit **content they created**. If `get_content.permission` is not `EDITOR` the save is rejected — ask the user whether to make a copy or request the change from the author |
 
 ## Recommended Chain

@@ -37,8 +37,10 @@ Returns the saved content ID, its type (`chart_rank`), its name, and the Analyti
 ## On Failure
 
 - Ranking or dimension validation error: fix the `preview_chart_rank` configuration and preview again.
-- Authorization error: perform ORG_WORKSPACE_GATE again.
-- Save API error: do not retry automatically — to avoid creating a duplicate, check with `list_contents` whether it was created.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Save API error, or the session expired during the call: do not retry automatically — to avoid creating a duplicate, check
+  with `list_contents` whether it was created before calling again. Use DUPLICATE_GATE's exact name/type recovery query (never `mine_only`; `limit=0` is allowed). An item that existed before the save does not count. Call again only after fresh WRITE_APPROVAL.
 
 ## Recommended Chain
 

@@ -37,28 +37,44 @@ the Analytics console URL.
 
 ## Decision Rules
 
-Treat it as "the same content" only when **all** of the following match.
+Treat it as "the same content" only when **all** of the following semantic settings match. Compare the stored
+`params` structure rather than only the preview arguments; ignore only server-derived or transient fields explicitly
+excluded below.
 
 1. `content_type` + `chart_type`
 2. `project`
-3. The measure composition in `params` (both metric- and event-based), `dimensions`, `adhoc_filters`
-4. `params.date_params` — **branch on `start_date_type`/`end_date_type` first.**
-   - `"V"` (relative): compare `start_value`/`end_value`. `start_date`/`end_date` are resolved at save time,
+3. The complete measure composition in `params` (metric and event tokens, formulas, per-term periods, per-term `filters`, grouping formulas,
+   aliases), plus `dimensions` and `adhoc_filters`
+4. Type-specific settings:
+   - `chart`: table display semantics such as pivots, row groups, per-column aggregation, and hidden columns. For a table,
+     call with `include_grid_config=true` when the summary does not prove an exact match.
+   - `chart_rank`: the chart settings above plus `rank_limit`, `rank_order`, `rank_tie_mode`, and `rank_group_mode`.
+   - `funnel`: `sections`, `compare_type`, `standard_days`, `tracking_days`, `convert_type`, and `user_display_type`.
+   - `retention`: `base_event`, `retention_event`, the identifier (stored as `conditions[].base_dimension`/`retention_dimension`),
+     `dimensions`, and `display_format`.
+5. `params.date_params`, including `period` and `minute_interval` when present — **branch on
+   `start_date_type`/`end_date_type` first.**
+   - `"V"` (relative): compare `period`, `start_period`/`end_period`, and `start_value`/`end_value`.
+     `start_date`/`end_date` are resolved at save time,
      so identical settings still show different dates — do not compare them.
    - `"F"` (fixed): the explicit `start_date`/`end_date` **are** the setting, so compare those.
      `start_value`/`end_value` come back as 0 and mean nothing here.
-   A `"V"` content and an `"F"` content are never duplicates of each other, even if the dates happen to line up.
+   Funnel `"ep"` is fixed and is compared like `"F"`. A relative content and a fixed content are never duplicates,
+   even if their resolved dates happen to line up.
 
 - If any one differs, it is not a duplicate. State in one line what differs and proceed.
 - `params` uses the console's storage format, which differs from the argument format of
   `preview_chart`/`create_chart` — the conversion rules are the same as described in the `get_content_template`
   tool docstring. Unlike templates, the event and metric idx values belong to the same company, so they do not
-  need to be looked up again.
+  need to be looked up again. Do not use them for another company's project.
 
 ## On Failure
 
 - Missing candidate or wrong asset kind: return to `list_contents` and select a row with `kind="content"`.
-- Workspace mismatch or permission error: repeat ORG_WORKSPACE_GATE for the candidate's workspace.
+- Pass the workspace from the candidate's `list_contents` row. If you passed a different one, run ORG_WORKSPACE_GATE for
+  the row's workspace and call again.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 - Empty or malformed detail: report that exact comparison is unavailable; do not declare a duplicate from the list row.
 
 ## Recommended Chain

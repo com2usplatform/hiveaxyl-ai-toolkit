@@ -10,18 +10,18 @@ description: |
   TRIGGER when:
   - The user asks whether a metric has spiked, dropped, or looks unusual
   - The user asks to scan several metrics for unusual changes
-  - The user asks for possible reasons behind a metric change
+  - The user asks whether a metric change is unusual and what to verify next
 
   DO NOT TRIGGER when:
-  - The request is only for a metric value → use preview_chart directly
-  - The request is a dimension breakdown → use axyl-drill-down-metrics
+  - The request is only for a metric value → use axyl-analytics-common (preview_chart)
+  - The change is already established and the request is only to break down contributors by dimension → use axyl-drill-down-metrics
   - The user asks to save a chart or dashboard → use axyl-create-content
 ---
 
 # axyl-detect-anomaly
 
 > **CRITICAL — Read [axyl-analytics-common](../axyl-analytics-common/SKILL.md) first.**
-> **CRITICAL — Complete PROJECT_ID_GATE, ORG_WORKSPACE_GATE, SCHEMA_FIRST, and EXISTING_ASSET_FIRST before querying.**
+> **CRITICAL — Complete PROJECT_ID_GATE, ORG_WORKSPACE_GATE, and SCHEMA_FIRST before querying.** EXISTING_ASSET_FIRST does not apply; use metric mode for a registered metric.
 > **CRITICAL — This skill produces a heuristic signal, not a statistical proof or a confirmed cause.**
 
 ## Supported Scope
@@ -46,22 +46,23 @@ Do not issue an automatic verdict when:
 
 Use a registered metric's final returned series as defined; do not reconstruct its ratio, average, or two-stage formula.
 `metric_category` and a metric name are not enough to classify revenue. Follow SCHEMA_FIRST and use `is_price=1` on
-the aggregated dimension when applying currency display rules. For an event count, use only an event and a non-null
-count field confirmed by `list_events` and `list_dimensions` or an existing content definition; never invent the count
-definition. Other event-based calculations are outside automatic detection.
+the aggregated dimension, together with an `is_currency=1` dimension on its event, when applying currency display
+rules. For an event count, use only an event and a non-null count field confirmed by `list_events` and
+`list_dimensions`, or the definition of a chart the user named; never invent the count definition. Other event-based calculations are outside automatic detection.
 
 ## Workflow
 
 ### 1. Confirm scope
 
 1. Confirm the project, organization, and workspace through the common gates.
-2. Search existing assets first. A saved asset may confirm the intended definition, but anomaly calculation still uses
-   `preview_chart` or `preview_retention` with explicit fixed dates.
+2. Do not search saved charts or dashboards on your own (EXISTING_ASSET_FIRST does not apply). But when the user names a saved chart or dashboard, follow the named-asset rule under EXISTING_ASSET_FIRST in [Query preparation](../axyl-analytics-common/references/query_preparation.md) (its filters and a named dashboard's global filters are kept); for a named dashboard, keep this skill's own comparison windows instead of its global period, and state that period.
+   Anomaly calculation uses `preview_chart` or `preview_retention` with explicit fixed dates.
 3. Confirm the metric and its type with `list_metrics`. If it is unregistered, follow SCHEMA_FIRST.
 4. Confirm the target interval and the time unit (`date_params.period`). If the time unit is omitted, use `D`. If the
    target interval is omitted, judge the last completed one in that unit (yesterday for `D`, last week for `W`). For Dn
    retention, the default target is the latest cohort whose day n has fully elapsed (the cohort of n + 1 days ago; two
-   days ago for D1). Tell the user what was judged.
+   days ago for D1). When the user names a range (for example, the last month), judge each completed interval in it at
+   `D` unless the user names another unit, under the scan rule in section 5. Tell the user what was judged.
 5. If the user asks to scan everything, select registered metrics that fit the supported scope. List unsupported or
    ambiguous metrics separately instead of silently forcing them into a default threshold.
 
@@ -88,7 +89,7 @@ hours that are `watch` or above, and tell the user that a dip shorter than an ho
 a time window to check by the minute. When the user names a time window, judge `MINUTE` directly inside it, at most
 one hour at a time: a short dip in a distinct-user count can disappear at `H` because most users of the dip are also
 counted in the rest of the hour. Minute intervals inside an hour, whether reached by drilling down or by a named window,
-are judged under the scan rule in step 5.
+are judged under the scan rule in section 5.
 
 For retention, query the target cohort and the previous 8 matured cohorts for the same weekday. A Dn value is usable
 only after day n has fully elapsed in KST.
@@ -103,8 +104,8 @@ Judge only completed intervals; a completed interval is treated as fully loaded.
 latest company-level activity timestamp for that event. It is useful activity metadata only and must never be used to
 claim that a target interval is fully loaded.
 
-- An empty or null value, or a zero that would itself be an outlier (`outlier_score <= -3.5` under step 4, or any zero
-  when the baseline is above 0 and the step-4 scale is 0), is
+- An empty or null value, or a zero that would itself be an outlier (`outlier_score <= -3.5` under section 4, or any zero
+  when the baseline is above 0 and the section-4 scale is 0), is
   `not judged — collection check needed` until the project, date range, metric definition, and related event activity
   have been checked. A zero that is not an outlier, common for a small count, is judged normally, but when the
   baseline is above 0, always show a collection note in the user-facing output, whatever the status:
@@ -136,11 +137,11 @@ to classify it; never pass its tokens to a tool or rebuild the value from them. 
 
 | Metric kind | How to classify | `size_variation` |
 |---|---|---|
-| Count | An event-mode count, or a registered metric whose `metric_config` has a single expression with `COUNT` or `COUNT_DISTINCT` and no `measure_date` or two-stage aggregation. A `COUNT` over a price field is a count; still pass `currency` as the server requires | `sqrt(max(baseline, 1))` |
-| Revenue | A `SUM` over an `is_price=1` field | `baseline / sqrt(max(baseline PU, 1))`, when a comparable registered PU metric is queried for the same references; otherwise 0 |
+| Count | An event-mode count, or a registered metric whose `metric_config` has a single expression with `COUNT` or `COUNT_DISTINCT` and no `measure_date` or two-stage aggregation. A `COUNT` over a price field is a count; still pass `currency` when its event has an `is_currency=1` dimension, as the server requires | `sqrt(max(baseline, 1))` |
+| Revenue | A `SUM` over an `is_price=1` field. An `is_currency=1` dimension on its event decides only whether `currency` is passed and how the amounts are labelled, not the metric kind | `baseline / sqrt(max(baseline PU, 1))`, when a comparable registered PU metric is queried for the same references; otherwise 0 |
 | Other | Averages, ratios of several expressions, two-stage aggregation, and anything unclassified | 0 |
 
-- `abs(outlier_score) >= 3.5` is the automatic statistical outlier rule for a single check (step 5 raises it for scans).
+- `abs(outlier_score) >= 3.5` is the automatic statistical outlier rule for a single check (section 5 raises it for scans).
   This is a heuristic, not a probability or proof.
 - If the user supplies a minimum business effect (absolute, relative, or percentage-point), require both the outlier rule
   and that effect before reporting a statistical outlier. If only the outlier rule passes, report `watch`.
@@ -149,7 +150,8 @@ to classify it; never pass its tokens to a tool or rebuild the value from them. 
   judgment.
 - Show the raw difference and relative deviation when `baseline != 0`; these explain magnitude but do not set the default
   threshold.
-- For revenue, show the confirmed currency. A comparable registered PU metric may be queried for explanation and for
+- For revenue, show the confirmed currency; when its event has no `is_currency=1` dimension, state that the amounts
+  are not converted instead. A comparable registered PU metric may be queried for explanation and for
   `size_variation`, but do not synthesize PU with an unconfirmed fallback definition. If the baseline PU is below 30, PU
   itself is within the usual range, and revenue is `watch` or above, report `watch` and list a few large payers as the
   first check.
@@ -162,10 +164,10 @@ to classify it; never pass its tokens to a tool or rebuild the value from them. 
   ```
 
   1. Take the same day of the month (and hour) in each of the previous 8 months. Replace a month with an older one
-     when the reference day, the day a week before, or the day a week after is a known exclusion (step 3), or when the
+     when the reference day, the day a week before, or the day a week after is a known exclusion (section 3), or when the
      reference day's weekday median is 0 or below; with fewer than 8, keep the status.
   2. Count the pattern months. Measure each reference day's deviation from its own weekday median in units of its own
-     step-4 scale (for revenue, with the target's baseline PU). Measure the same weekday one week before and one week
+     section-4 scale (for revenue, with the target's baseline PU). Measure the same weekday one week before and one week
      after it the same way, and take the mean of those two as its comparison deviation; a steady growth or decline moves
      the reference day and its comparison alike and cancels out, and a month-start event that runs longer than a week
      still differs from the week before. When a day's scale is 0, its deviation is a large value in the sign of its
@@ -178,7 +180,7 @@ to classify it; never pass its tokens to a tool or rebuild the value from them. 
      is established about a third of the time.
      Compute this with code when available. Otherwise lay out one row per reference month (day value, weekday median,
      scale, deviation, comparison deviation, difference, pattern month yes/no) before deciding.
-  3. Judge the target lift (`target / baseline`) against the 8 reference lifts with the step-4 rule and the single-check
+  3. Judge the target lift (`target / baseline`) against the 8 reference lifts with the section-4 rule and the single-check
      threshold 3.5, even inside a scan. Their `size_variation` is `sqrt(max(baseline × median lift, 1)) / baseline` for a
      count and `median lift / sqrt(max(baseline PU, 1))` for revenue, otherwise 0. When their scale is 0, an identical
      target lift is within the usual range and any other lift is not.
@@ -313,7 +315,7 @@ the change is 20% or more, say why in `What it means`: a small volume when the c
 `3.5 × size_variation`, otherwise the metric's usual swing. For example: `The change is large, but at this small volume
 changes this size happen without a specific cause.`
 
-For several metrics, start with one line of counts and a compact action table sorted as in step 5, then explain only
+For several metrics, start with one line of counts and a compact action table sorted as in section 5, then explain only
 `Needs attention` and `Monitor` rows:
 
 ```text
@@ -343,3 +345,10 @@ user asks for statistical details. Never expose internal identifiers.
 - Do not call the outlier score a probability, confidence level, or proof of an incident.
 - Do not infer an anomaly's cause from timing alone.
 - Do not save or modify Analytics assets while running this read-only skill.
+
+## Exception Handling
+
+| Situation | Response |
+|------|------|
+| Organization or workspace authorization denial | Do not retry the same call unchanged or with a guessed identifier; follow MCP_ACCESS_GATE (denied call with `org_idx`) |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

@@ -1,7 +1,7 @@
 # User Ranking Query (preview_chart_rank + userId dimensions, general-purpose)
 
 > **Prerequisite:** Follow the rules in [`../SKILL.md`](../SKILL.md) and [`../../axyl-analytics-common/SKILL.md`](../../axyl-analytics-common/SKILL.md).
-> For detailed arguments and constraints, see the [preview_chart_rank tool contract](../../axyl-analytics-common/references/preview_chart_rank.md).
+> For detailed arguments and constraints, use the `preview_chart_rank` tool contract linked directly from this skill's `SKILL.md`.
 
 ## When to Use
 
@@ -112,7 +112,8 @@ with `dimensions=[{idx: <dimension_idx>, name: "userId"}]`, and choose the ranki
 ## Handling the Result
 
 - Present the result as top (`desc`) or bottom (`asc`) ranks according to `rank_order`.
-- **For revenue and other monetary metrics**, always display the currency basis alongside. (For example, 12,345 USD)
+- **For revenue and other monetary metrics**, always display the currency basis alongside. (For example, 12,345 USD) When its event has no `is_currency=1`
+  dimension, state that the amounts are not converted instead.
 - To investigate one selected user's activity, purchases, or logins, hand off to `axyl-inspect-user`.
 - This skill stops at ranking and does not query an individual user's activity history.
 

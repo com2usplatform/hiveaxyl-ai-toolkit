@@ -19,11 +19,16 @@
 
 | Field | Meaning |
 |------|------|
+| `event_name` | Standard event name |
+| `event_category` | Event category (`User`, `Gameplay`, `Revenue`, `Campaign`, `Advertisement`) |
+| `description_ko` | Event description (Korean) |
+| `sdk_type` | The SDK type the result was projected for |
+| `is_baseline` | `Y` for a baseline event of that SDK, otherwise `N` |
 | `target_collect` | Collection ownership for the event as a whole. `GAME` means the game sends it directly; `AUTO` means the SDK collects it automatically |
 | `attributes[].name` | Name of the property to send |
 | `attributes[].data_type` | Property data type |
 | `attributes[].desc_ko` | Meaning of the property value and its format convention |
-| `attributes[].target_collect` | Collection ownership for that property, per SDK |
+| `attributes[].target_collect` | Collection ownership for that property, per SDK. `null` when the property is not mapped for that SDK; do not read it as `GAME` or `AUTO` |
 | `attributes[].field` | Post-ingestion location classification for the property |
 
 `attributes[].field` is not the location you send the value in. The payload you send is flat JSON that keeps required
@@ -50,6 +55,6 @@ because they are stored in `hiveAttributes`.
 ## Recommended Chain
 
 ```text
-Phase 3 company_cd confirmed → list_recommended_events → identify repository insertion points
+company_cd confirmed through PROJECT_ID_GATE → list_recommended_events → identify repository insertion points
 → get_event_spec → generate send code
 ```

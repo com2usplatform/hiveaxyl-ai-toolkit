@@ -20,7 +20,7 @@ Takes the same parameters as `update_chart` (`company_cd`, `org_idx`, `workspace
 
 | Parameter | Required | Description |
 |---------|------|------|
-| `dimensions` | N | New dimension list. **A ranking needs something to rank by, so it cannot be emptied** |
+| `dimensions` | N | New dimension list. **A ranking needs something to rank by, so it cannot be emptied**. Buckets follow the "Dimension buckets" section of `preview_chart` |
 | `rank_limit` | N | New top N (1 or more) |
 | `rank_order` | N | `desc` or `asc` |
 | `rank_tie_mode` | N | Tie handling (`sequence`, `rank`, `dense`) |
@@ -63,11 +63,12 @@ reporting a write (POST_WRITE_LINK)**.
 
 | Symptom | What to do |
 |------|------|
-| `perDimension` with only one dimension | Pass `rank_group_mode='combined'` as well |
+| `perDimension` with only one dimension | Pass `rank_group_mode='combined'` as well, after fresh WRITE_APPROVAL (say what changed) |
 | `dimensions` passed as an empty list | A ranking needs at least one dimension |
 | `rank_limit` is 0 or less | Use an integer of 1 or more |
-| Table setting points at a missing column | Read the column list in the error and pass the grid argument too |
+| Table setting points at a missing column | Read the column list in the error and pass the grid argument too, after fresh WRITE_APPROVAL (say what changed) |
 | Content created by someone else | A workspace member can only edit **content they created**. If `get_content.permission` is not `EDITOR` the save is rejected — ask the user whether to make a copy or request the change from the author |
+| API error or session expiry | Do not retry automatically; check with `get_content` whether it took effect |
 
 ## Recommended Chain
 

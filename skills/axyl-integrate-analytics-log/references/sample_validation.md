@@ -62,7 +62,7 @@ even if registered afterwards.
 
 - Propose this only for a pre-launch project. If it is released and live, point to users excluded from metrics instead.
 - Do not use the current time or the sample send time as the start date.
-- Have the actual launch or aggregation start time confirmed in `YYYY-MM-DDTHH:mm:ss` format in the organization's time zone.
+- Have the actual launch or aggregation start time confirmed in `YYYY-MM-DDTHH:mm:ss` format in the company's time zone.
 - An administrator shows the existing value, the new value, and the project-wide metric impact, obtains separate approval, then
   calls `regist_start_dates` and re-queries.
 - A non-administrator compiles the organization name, project name, `appid_group`, current value, requested start date, and time
@@ -75,7 +75,9 @@ Show the final payload, the configuration result, and any remaining contaminatio
 
 After approval, send only 1–2 samples. Reuse the dry-run's `userId`, `deviceId`, `eventTime`, `guid`, and `confirmation_token`
 exactly as given, and pass the same `org_idx`. Do not display the token to the user, and if the payload, organization, project, or
-environment changes, or the token expires, start again from the dry-run.
+environment changes, or the token expires, start again from the dry-run. When an exclusion was already registered or handed over
+for the earlier test `userId`/`deviceId`, pass those same values into the new dry-run so the exclusion still covers the sample; if the
+new payload's identifiers differ from the excluded ones, stop and redo the exclusion step.
 Report the results with these distinguished.
 
 - The send API response

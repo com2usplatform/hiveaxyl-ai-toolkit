@@ -69,7 +69,7 @@ source: recommended_catalog | platform_template | user_specified
 | `NOT_READY` | `ATTRIBUTE_NO_DATA` | Raw event rows exist but the properties strictly required to compute, break down, or filter this content have no values | The event arrives, but the values needed for computation, breakdown, or filtering are absent |
 | `NOT_READY` | `NO_DATA` | `query_adhoc` finds no raw event rows for that project | No source data for the project in the query period |
 | `UNMAPPED` | `DATA_CONTRACT_UNCONFIRMED` | There is no basis for safely mapping the recommended content to an actual metric or event | The required data definitions must be confirmed |
-| `UNVERIFIABLE` | `QUERY_FAILED` | It cannot be judged due to a permission, tool, or query error, or a truncated result | The error must be resolved and the check rerun |
+| `UNVERIFIABLE` | `QUERY_FAILED` | It cannot be judged due to a permission, tool, or query error that MCP_ACCESS_GATE (or one read retry) does not resolve, or a truncated result | The error must be resolved and the check rerun |
 
 ## Final Data Determination Rules, Event and Property Based
 
@@ -93,7 +93,8 @@ Do not skip or reorder the steps below.
    ├─ event_rows > 0, but a required property has no non-null entry in that source
    │                           → NOT_READY / ATTRIBUTE_NO_DATA
    ├─ event_rows = 0           → NOT_READY / NO_DATA
-   └─ permission, tool, or query error → UNVERIFIABLE / QUERY_FAILED
+   └─ permission, tool, or query error that MCP_ACCESS_GATE (or one read retry) does not resolve
+                               → UNVERIFIABLE / QUERY_FAILED
 ```
 
 Property metadata and raw values do not substitute for each other. Only a property that is defined in `list_dimensions` and has a
@@ -164,7 +165,7 @@ An event-based measure does not support `COUNT(*)`, so always confirm at least o
        Declined → keep `NOT_READY / ATTRIBUTE_NO_DATA`. A required filter mapping left unconfirmed →
        `UNVERIFIED / FILTER_VALUE_UNVERIFIED`.
    - `event_rows = 0` → `NOT_READY / NO_DATA`
-   - Permission, tool, or query error → `UNVERIFIABLE / QUERY_FAILED`
+   - Permission, tool, or query error that MCP_ACCESS_GATE (or one read retry) does not resolve → `UNVERIFIABLE / QUERY_FAILED`
 9. Keep `query_adhoc` to one call per event, and put every required property of that event in one `dimension_names` (up to 20).
    The cost is independent of how many properties you pass. The result aggregates every row in the period, not a sample, so a
    property in `missing_dimensions` had no non-null value anywhere in that period.
@@ -177,7 +178,8 @@ An event-based measure does not support `COUNT(*)`, so always confirm at least o
    evidence of whether the event is collected — do not judge the presence of property values from that one row. To check property
    values for one AppID, call `dimension_names` mode with `filters={"appId": "..."}`.
 11. Always include the currency basis for revenue content. If `list_currencies` returns one, use it as is; if several, have the user
-    choose. If the result is empty, use `USD` as the default but state that it is a fallback.
+    choose. If the result is empty, use `USD` as the default but state that it is a fallback. When its event has no
+    `is_currency=1` dimension, pass no `currency` and state that the amounts are not converted instead.
 12. `data_source` is not evidence of collection (some events are ingested even when it is empty). Use the `hive`/`custom`/
     `appsflyer` distinction only to judge who to ask for log improvements.
 13. The recommendation catalog decides the scope of recommendations; the actual company metrics, events, and collection state decide

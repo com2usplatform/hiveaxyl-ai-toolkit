@@ -9,7 +9,8 @@ Read this document when moving the `params` returned by `get_content_template` i
 
 - When an `axyl-design-dashboard` handoff carries a `platform template reference`
 - When the user asks to build content from a specific template
-- When building similar content by referring to existing content (`get_content.params`) — the format is the same
+- When building similar content by referring to existing content (`get_content.params`) in the same company — the format
+  is the same (the idx values are already this company's; another company's project is not supported)
 
 ## Two Principles
 
@@ -34,7 +35,7 @@ You must **expand** them per the table below. Only the **format** changes — **
 |---|---|---|
 | `chart_type` | `chart_type` | As is |
 | `measure[]` | `event_measures[]` | See "Converting measure" below |
-| `dimensions[]` | `dimensions` | As is (the idx values are already the company's) |
+| `dimensions[]` | `dimensions` | As is (the idx values are already the company's). Buckets (`buckets`) are passed as is too (the "Dimension buckets" section of `preview_chart`) |
 | `date_params` | `date_params` | For a `"V"` type, pass only the relative offsets (see Pitfalls) |
 | `adhoc_filters` | `adhoc_filters` | The idx values are already the company's; **check the filter values** before carrying them over (see "Dimension filters" below) |
 | `grid_config_summary.pivot_col_ids` | `pivot_col_ids` | As is |
@@ -54,7 +55,8 @@ Read `measure[].expressions[].tokens` and build the terms.
 | A single `{type:"metric", idx, text, measure_field}` | `{"metric_idx": <the token's idx>, "metric_name": <the token's text>}` — both are already the company's values |
 | A `{type:"event"}` + `{type:"event_detail"}` pair | `{"event_idx", "event_name", "dimension_idx", "dimension_name", "formular"}` — `event_detail.measure_field` → `dimension_name`, `measure_formular` → `formular` |
 | `event_detail` has `measure_group_field`/`measure_group_format` | It is a two-stage aggregation. See "Converting a two-stage aggregation" below |
-| `operator` and `number` tokens are mixed in | A formula → `{"operands": [terms...], "operators": ["/", ...]}` |
+| `expressions[i].filters` (a filter on that term only, such as `newUser=Y` that turns AU into NU) | Carry it as `filters` on the term built from that expression — on the measure itself for a single expression, on the matching `operands` term in a formula. Check its values as in "Dimension filters" below. **Dropping it saves a wrong number with no error** (NU becomes AU) |
+| `operator` and `number` tokens are mixed in | A formula → `{"operands": [terms...], "operators": ["/", ...]}`. Convert each `number` token's `text` to a number and add it as a term in the same position. Group what lies between `operator` tokens `(` and `)` into a sub-formula term (the "Measure options" section of `preview_chart`) |
 
 ### Converting a two-stage aggregation
 
@@ -66,7 +68,7 @@ either saves the wrong aggregation or raises an error. Split it as below.
 | Token field | `create_*` argument | Conversion |
 |---|---|---|
 | The **first** value of `measure_formular` | `formular` | `"COUNT_DISTINCT,MAX"` → `"COUNT_DISTINCT"` (the first aggregation) |
-| The **second** value of `measure_formular` | `group_formular` | → `"MAX"` (the second aggregation. `MAX`\|`AVG`\|`LAST`) |
+| The **second** value of `measure_formular` | `group_formular` | → `"MAX"` (the second aggregation. `MAX`\|`AVG`\|`LAST`\|`MIN`) |
 | `measure_group_format` | `group_format` | As is (`MINUTE`\|`H`\|`D`\|`M`\|`Y`) |
 | `measure_group_interval` | `group_interval` | Pass it only when `group_format` is `"MINUTE"` (`1`\|`2`\|`5`\|`10`). Otherwise **do not pass it** — the server's saved copy comes back as `0` when unused, and passing that through raises a `ValidationError` |
 | `measure_group_field` | — | Do not pass it. The tool fills it in as `"dateTime"` automatically |
@@ -77,13 +79,18 @@ The formats and constraints follow the "Two-stage aggregation" section of `previ
 > that period into one value and spreads it as a constant across the chart's dates). It cannot be expressed as a `create_*`
 > argument, so do not move it into a chart — reference that metric by `metric_idx`, or register a new one with `create_metric`.
 
-Keep the measure-level fields outside.
+Keep the measure-level fields outside (each term's `filters` stay on the term, as above).
 
 - `measure[].name_alias` → `alias`
 - `measure[].decimal_point` → `decimal_point`
 - `measure[].percent` → `percent`
-- If `measure[].currency_options` is present → **`currency` is required.** Confirm it with `list_currencies(company_cd)` and use
-  `"USD"` if the result is empty. Leaving it blank raises a `ValidationError`.
+- If `measure[].currency_options` is present and the mapped price dimension's event has an `is_currency=1` dimension →
+  **`currency` is required.** Confirm it with `list_currencies(company_cd)` (one → use it; several → ask the user; empty →
+  `"USD"`, and disclose the fallback). Leaving it blank raises a `ValidationError`. Otherwise pass no `currency` and state
+  that the amounts are not converted.
+  - For a formula measure, put `currency` on each revenue term inside `operands`, not on the outer measure. Only the first
+    revenue term's conversion is applied, so build revenue terms from different events as separate measures.
+  - If the alias names a currency (for example `(KRW)`), make it match the `currency` you pass.
 
 ### Why You Must Not Search by Name
 
@@ -215,11 +222,11 @@ So the skill's job is **format conversion only**.
 - **`aggregation` is a dict.** The template gives a `[{"col_id":..., "agg_func":...}]` list, but the argument is a
   `{col_id: agg_func}` dict. Passing the list through raises a `ValidationError`.
 - **`col_id` rules** — the aggregation's `col_id` is the measure's `name_alias` (not the company metric name), while the pivot
-  and row-group `col_id` values are dimension names or `dateTime`. In a ranking table, `순위` (Rank) is also available.
+  and row-group `col_id` values are each dimension's `name_alias` (else its name) or `dateTime`. In a ranking table, `순위` (Rank) is also available.
 - **When `date_params` is `"V"` (relative), pass only the `start_value`/`end_value` offsets.**
   Do not compute `start_date`/`end_date` or copy the template's values. The absolute dates stored alongside in the template were
-  resolved at save time and are past values, not the relative period's configuration. The MCP tool also defends against this by
-  stripping absolute dates from a `"V"` range.
+  resolved at save time and are past values, not the relative period's configuration. For charts and retentions the MCP tool also defends
+  against this by stripping absolute dates from a `"V"` range; funnels keep them, so never pass them.
 - **The template author's company and project are removed from params before you get them.** A saved template carries the
   creator's `company_cd`, `appid_group`, and `game_name` (for example, `company_cd: <template_company_cd>`,
   `appid_group: "<template_appid_group>"`), and using them as is would build content for a different company and project. The tool

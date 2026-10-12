@@ -59,9 +59,11 @@ list_user_activities(company_cd, org_idx, appid_group, user_id,
 `page` starts at **0**. The server does not return a total count, so the only signal for whether a
 next page exists is `has_more` (`count >= size`).
 
-**Do not page through everything.**
-When there are many entries, narrow the range using the per-date items in the summary and call again,
-or ask the user which range to look at.
+**Do not exhaust an unrelated broad history.** First narrow the range using the per-date items in the summary.
+Once it is at the smallest supported date range, a targeted check for a specific event or property continues sequentially
+until the evidence is found or `has_more=false`. If the remaining volume is impractical, stop and say that the result is
+incomplete, then ask for a narrower date or more identifying detail. Absence from page 0 is never evidence of absence from
+the selected range.
 
 ### properties
 

@@ -1,6 +1,6 @@
 # create_dashboard (Create Dashboard)
 
-> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). ORG_WORKSPACE_GATE + **WRITE_APPROVAL** are required.
+> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). ORG_WORKSPACE_GATE + DUPLICATE_GATE + **WRITE_APPROVAL** are required.
 
 ## When to Use
 
@@ -17,6 +17,8 @@
 | `org_idx` | Y | Organization idx (used for authorization; not included in the dashboard body) |
 | `workspace_idx` | Y | Workspace idx (the location where the dashboard will be created) |
 | `dashboard_desc` | N | Description |
+| `date_params` | N | Dashboard-wide period, applied to every content inside it (separate from each content's own period). Same format as `update_dashboard`: fixed dates are date only (`"2026-10-02"`), and a time part is cut to the date. Omit for none |
+| `adhoc_filters` | N | Dashboard-wide filters. Each item uses the `index` filter format of `preview_chart`, and applies to every member by the dimension name — take `idx` from any one member's event and confirm every member's event has a dimension with that name. Omit for none |
 
 ### contents Structure
 
@@ -32,9 +34,11 @@
 - `content_idx`: Value returned by `create_*`, or an existing content idx verified by `get_content` in the same
   organization and workspace. Do not guess (NO_GUESSING).
 - `content_type`: `"chart"` | `"chart_rank"` | `"funnel"` | `"retention"`.
-- `chart_type`: Used to determine placement size **only for charts** (`scorecard`/`table`/other). May be omitted.
+- `chart_type`: Used to determine placement size for charts (`scorecard`/`table`/other) and rankings (`table`/other). May be omitted.
 - `width` / `height` / `memo`: optional. Width on the 24-column grid, height, and a cell memo. Omit them for the type's default
   size; pass the values from `get_dashboard` or `get_dashboard_template` to keep an existing layout.
+- `row`: optional. The row number from `get_dashboard` or `get_dashboard_template`; a new row starts where the value changes.
+  Pass it with the sizes so separate rows do not merge.
 
 ## Layout
 
@@ -54,20 +58,29 @@ Returns the saved dashboard ID and the Analytics console URL.
 - Run DUPLICATE_GATE before creation and obtain WRITE_APPROVAL for the final content order and target workspace.
 - Every `content_idx` must identify a saved content item in the same workspace, with the matching `content_type`.
 - Preserve the requested display priority through `contents` order; placement coordinates are calculated by the server.
+- Pass dashboard-wide `date_params`/`adhoc_filters` at creation when the request includes them or a template or design
+  handoff carries them, and show the exact settings in the WRITE_APPROVAL summary.
+  Before passing global settings from a template, a design handoff, or a dashboard being recreated, check each global `index` filter's dimension with
+  `list_dimensions` and its values against this company's data (dashboard templates do not convert the dimension idx to
+  this company's), and have the user confirm a fixed (`F`) period. Never drop a setting that does not match on your own: dropping a filter widens the
+  population, so say so and let the user choose (a matching dimension or value, or creating without it knowing the scope is wider).
 - This tool creates a new dashboard and cannot modify an existing one — use `update_dashboard` to change an existing dashboard.
 
 ## On Failure
 
 - Empty or malformed `contents`: provide at least one valid content object and correct its type.
 - Missing or mismatched content: verify it with `get_content` in the target workspace.
-- Permission error: repeat ORG_WORKSPACE_GATE.
-- Save API error: do not automatically retry; use `list_contents` to check whether the dashboard was created.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Save API error, or the session expired during the call: do not automatically retry; use `list_contents` to check whether the dashboard was created before calling again. Use DUPLICATE_GATE's exact name/type recovery query (never `mine_only`; `limit=0` is allowed). An item that existed before the save does not count. Call again only after fresh WRITE_APPROVAL.
 
 ## Recommended Chain
 
 ```
-create_chart / create_chart_rank / create_funnel / create_retention (× N, collect content_idx values)
-→ [WRITE_APPROVAL] → create_dashboard(contents=[collected content_idx values in order])
+(DUPLICATE_GATE for the dashboard, before any child content is written)
+→ create_chart / create_chart_rank / create_funnel / create_retention (× N, collect content_idx values)
+→ [WRITE_APPROVAL] → create_dashboard(contents=[collected content_idx values in order],
+  date_params/adhoc_filters when requested)
 ```
 
 The server rejects an empty `contents` list, unknown/mismatched content types, and content that does not belong

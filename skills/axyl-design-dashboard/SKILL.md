@@ -14,7 +14,8 @@ description: |
 
   DO NOT TRIGGER when:
   - The composition is settled and only saving and assembly remain → axyl-create-content
-  - Data is only queried or analyzed, with no saving → axyl-drill-down-metrics
+  - The request is read-only: use axyl-analytics-common for a value, axyl-detect-anomaly for anomaly judgment, or
+    axyl-drill-down-metrics for dimensional contributor analysis
   - Game client log send code is being implemented → axyl-integrate-analytics-log
   - The request is to create a segment → axyl-create-segment
 ---
@@ -42,7 +43,7 @@ description: |
 - **Company schema:** `list_metrics` / `list_events` / `list_dimensions` / `list_currencies`
 - **Actual ingestion:** `query_adhoc`
 
-The detailed arguments, return values, and permission scopes follow the [per-tool references in axyl-analytics-common](../axyl-analytics-common/SKILL.md).
+The detailed arguments, return values, and permission scopes follow the direct tool-reference links in [axyl-analytics-common](../axyl-analytics-common/SKILL.md).
 A platform template is a reference design, not an asset already created in the user's workspace. Judge actual duplication by
 finding candidates with `list_contents` and comparing the detailed configuration from `get_content`/`get_dashboard`.
 
@@ -57,7 +58,8 @@ finding candidates with `list_contents` and comparing the detailed configuration
 
 ### Prerequisite — Review the common rules
 
-PROJECT_ID_GATE, SCHEMA_FIRST, and NO_GUESSING from axyl-analytics-common apply. This skill performs only reads and design.
+MCP_CONNECTION_GATE, MCP_ACCESS_GATE, PROJECT_ID_GATE, SCHEMA_FIRST, and NO_GUESSING from axyl-analytics-common apply.
+This skill performs only reads and design.
 DESIGN_APPROVAL_GATE, which settles the recommended composition, and WRITE_APPROVAL, which permits the actual save, are two
 different approvals. WRITE_APPROVAL is applied separately at create-content's actual creation step, after its preview.
 A recent-ingestion query needs a confirmed `org_idx`. When comparing existing assets per workspace, confirm `workspace_idx` as well.
@@ -90,6 +92,9 @@ Step 1-2. Confirm the organization to use for the recent-ingestion query
   → reuse a confirmed org_idx for the same project if one exists
   → otherwise, check_analytics_admin(company_cd)
   → list_organizations(company_cd, appid_group) — pass the filter for administrators too
+  → if there is none, do not guess org_idx: no organization you can use through MCP is linked to this project. Ask an Analytics administrator either to link
+    the project to one of your MCP-enabled organizations or to grant you MCP access in an organization already linked
+    to it; a query without appid_group cannot tell which applies ⛔
   → if there are several candidates, present the organization names and wait for the user to choose ⛔
 
 Step 1-3. list_projects(company_cd, org_idx)
@@ -147,12 +152,15 @@ Step 3-4. Query details only for the selected candidates
      └─ use the child details' name, type, and params as the basis for the content design and the readiness judgment
 
 Step 3-5. Search for existing asset candidates with list_contents(company_cd, org_idx, workspace_idx, ...)
-  → compare detailed compositions only for the candidates, passing the same org_idx/workspace_idx to get_content/get_dashboard
+  → query by the selected candidate's name and available metric names; do not preload the workspace inventory
+  → if truncated=true, keep the result bounded and state that older assets were not exhaustively checked
+  → compare detailed compositions only for the returned candidates, passing the same org_idx/workspace_idx to get_content/get_dashboard
 ```
 
 Do not query the detailed params of the entire list at once. The recommendation catalog and the platform templates are
 different assets, so do not assume an identical ID or composition merely because the names are similar.
 `list_contents.match` is only a candidate grade, so do not settle on a duplicate from `exact` alone.
+This is a design-time existing-asset check; axyl-create-content performs DUPLICATE_GATE again immediately before saving.
 
 For each recommendation, explain the following.
 
@@ -203,6 +211,7 @@ Step 4-4. First-pass screening with list_events's last_data_date_kst
 
 Step 4-5. For a revenue item, confirm the currency basis with list_currencies(company_cd)
   → use it as is if there is one, ask the user to choose if there are several, and if empty, use USD as the default and say so
+  → when its event has no is_currency=1 dimension, pass no currency and state that the amounts are not converted
 
 Step 4-6. Aggregate the property values with query_adhoc(dimension_names=[...]) for the events that passed Step 4-4
          (one call per event for the last 14 days; for a fixed-period metric, use that period and split it into consecutive
@@ -215,7 +224,8 @@ Step 4-6. Aggregate the property values with query_adhoc(dimension_names=[...]) 
                                                       → NOT_READY / ATTRIBUTE_NO_DATA
      └─ another source has values → offer a switch in the Phase 5 result review (feasibility rule 8)
   → event_rows = 0                                    → NOT_READY / NO_DATA
-  → permission, tool, or query error      → UNVERIFIABLE / QUERY_FAILED
+  → permission, tool, or query error that MCP_ACCESS_GATE (or one read retry) does not resolve
+                                                      → UNVERIFIABLE / QUERY_FAILED
 ```
 
 `get_content_template` already returns the idx values inside the template params substituted to the target company's values.
@@ -318,4 +328,6 @@ The event, or a property strictly required to compute, break down, or filter thi
 | A parent dashboard template's child name or type is `null` | Query `get_content_template` directly with the `content_idx`. Mark only the references where the direct query also fails as `child template details unavailable`, and do not stretch that into deleted or dataless |
 | A child content template does not match the target company's schema | Mark the unconfirmed items via `params.unresolved_idx`, and do not reinterpret them by name or substitute arbitrarily |
 | `list_events` has no event, or no ingestion in the last 14 days | Judge them `NOT_READY / EVENT_NOT_DEFINED` and `NOT_READY / NO_RECENT_DATA` respectively, and skip the project and property ingestion queries for that event. For a fixed-period metric, do not apply the recent-14-day branch; query its fixed period instead |
-| Permission or query error | Mark it `unverifiable` and do not convert it into uncollected or unimplementable |
+| Organization or workspace authorization denial | Do not retry the same call unchanged or with a guessed identifier; follow MCP_ACCESS_GATE (denied call with `org_idx`) |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |
+| Permission or query error that MCP_ACCESS_GATE (or one read retry) does not resolve | Mark it `unverifiable` and do not convert it into uncollected or unimplementable |

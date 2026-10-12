@@ -26,16 +26,16 @@ Axyl:
       "deviceId": "3f9c2a7e1b4d4e8f9a6c5b2d1e0f7a8c",
       "eventTime": "2026-09-01T14:03:21+09:00",
       "eventName": "asset_get",
+      "identifierProvider": "hive",
       "assetName": "dia",
       "amountPrev": 100,
       "amountCurr": 120,
       "guid": uuid()
     }
 
-For Axyl, the game does not build the JSON above itself. Fill the `EventTime`, `EventName`, and `DeviceId` fields of
+For Axyl, the game does not build the JSON above itself. Fill the `EventTime`, `EventName`, `DeviceId`, and `IdentifierProvider` (`"hive"`) fields of
 `ClientLogEvent` and its `AdditionalProperties` (event properties and guid), and the SDK serializes them into this structure.
-`AdditionalProperties` values are strings holding JSON values (number `"100"`, string `"\"dia\""`). The server fills
-identifierProvider with `hive`. Follow section 6 of the Hive Axyl SDK flow for the detailed rules.
+`AdditionalProperties` values are strings holding JSON values (number `"100"`, string `"\"dia\""`). Follow section 6 of the Hive Axyl SDK flow for the detailed rules.
 
 Do not create the following in the game payload.
 
@@ -76,10 +76,10 @@ What the game passes, per SDK:
 | SDK | Required properties the game puts in itself | Minimal example |
 |-----|-----------------------------|-----------|
 | Hive SDK v4 | eventName | `{"eventName":"asset_get"}` |
-| Hive Axyl | deviceId, eventTime, eventName | `{"deviceId":"<DeviceKey>","eventTime":"2026-09-01T14:03:21+09:00","eventName":"asset_get"}` |
+| Hive Axyl | deviceId, eventTime, eventName, identifierProvider | `{"deviceId":"<DeviceKey>","eventTime":"2026-09-01T14:03:21+09:00","eventName":"asset_get","identifierProvider":"hive"}` |
 
-Axyl fills three of the required properties on the game's behalf: appId, userId, and identifierProvider. appId comes from the
-X-App-Id the SDK sends, userId from the X-Hive-Player-Id the gateway fills, and the server always overwrites identifierProvider with `hive`. The game passes the remaining required properties and the GAME custom properties
+Axyl fills two of the required properties on the game's behalf: appId and userId. appId comes from the
+X-App-Id the SDK sends and userId from the X-Hive-Player-Id the gateway fills. The game sets identifierProvider to `"hive"`. The game passes the remaining required properties and the GAME custom properties
 directly, all at the same level.
 
 Every other header is ingested into hiveAttributes without a prefix — `os`, `sdkVer`, `deviceId` — and does not fill a
@@ -104,7 +104,7 @@ obtained, do not omit the property — fill it with `"0"` or `"unknown"` and sen
 - For eventTime, put in the actual event occurrence time directly. It is always obtainable, so do not use a fallback. For Axyl,
   put a `DateTimeOffset` in `ClientLogEvent.EventTime` and the SDK converts it to RFC 3339 including the UTC offset. If it is not
   set, `0001-01-01T00:00:00.0000000+00:00` is sent, so always set it.
-- For Axyl, the server always overwrites identifierProvider with `hive`, so the game does not set it.
+- For Axyl, the game sets identifierProvider to `"hive"`.
 - For deviceId, confirm the Axyl DeviceKey the app creates, stores, and passes in the repository, and reuse the same value. Always
   send it, regardless of auth state. If a custom auth implementation owns DeviceKey creation and there is no existing value,
   generate a UUID-based value once and store it. If a Recipe or the auth module manages it internally and the exposure point

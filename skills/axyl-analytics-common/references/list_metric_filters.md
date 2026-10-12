@@ -1,6 +1,7 @@
 # list_metric_filters (List Metric Filters)
 
-Lists the metric filters registered for an organization. A metric filter is a configuration that excludes logs coming
+Lists the metric filters registered for the projects an organization can access. Filters apply per project, so the list
+also shows registrations made through other organizations linked to the same project. A metric filter is a configuration that excludes logs coming
 from QA servers or test apps from metric calculation.
 
 > **Prerequisite:** Follow SETTING_ACCESS_GATE in [`../SKILL.md`](../SKILL.md).
@@ -20,7 +21,8 @@ from QA servers or test apps from metric calculation.
 ## Return Value
 
 Returns `idx`, `title`, `project_id`, `filter_type`, and `filter_value` for each registration.
-`filter_type` is either `appId` (by app ID) or `serverId` (by server ID).
+`filter_type` is usually `appId` (by app ID) or `serverId` (by server ID), but listing can return other types too;
+only registration (`regist_metric_filter`) is limited to those two.
 Deleted registrations are excluded.
 
 ## Decision Rules
@@ -28,12 +30,12 @@ Deleted registrations are excluded.
 - A registration is stored as **one row per project and per value**. Even a single registration call appears as several rows.
 - Metric filters apply to every metric calculation. When asked about a number, check this configuration first, and if a
   filtered server or app is involved, explain that as part of the answer.
-- **The whole organization is returned.** To look at a single project, filter the response by `project_id` yourself
+- **Every project the organization can access is returned.** To look at a single project, filter the response by `project_id` yourself
   (the same way you would for `list_except_users` and `list_start_dates`).
 
 ## On Failure
 
-- Empty result: no metric filters are registered for this organization.
+- Empty result: no metric filters are registered for this organization's projects.
 
 ## Recommended Chain
 

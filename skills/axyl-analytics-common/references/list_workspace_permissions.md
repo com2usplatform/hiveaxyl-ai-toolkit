@@ -33,7 +33,8 @@ Returns the organization-wide `total`, `pending`, `approved`, and `rejected` cou
 
 ## On Failure
 
-- Organization access error: recheck the accessible organizations with `list_organizations`.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 - A `pending` of `0` means there is nothing to process.
 
 ## Recommended Chain

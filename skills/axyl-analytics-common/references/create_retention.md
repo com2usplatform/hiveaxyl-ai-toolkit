@@ -1,6 +1,6 @@
 # create_retention (Save Retention Content)
 
-> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + **WRITE_APPROVAL** are required.
+> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + DUPLICATE_GATE + **WRITE_APPROVAL** are required.
 
 ## When to Use
 
@@ -24,6 +24,8 @@ All query parameters follow `preview_retention`: `project`, `date_params`, `base
 - `content_name`: Name of the content to save (default: `"retention"`). A meaningful name is recommended.
 - `content_description`: Optional.
 - `org_idx` is accepted only for authorization and is not included in the saved body.
+- `dimensions` must come from `list_dimensions(company_cd, base_event.event_name)`. Only the save validates them — it
+  rejects a dimension that is not on the base event, which `preview_retention` does not check.
 
 ## Return Value
 
@@ -41,12 +43,13 @@ Returns the saved content ID, type (`retention`), name, and Analytics console UR
 ## On Failure
 
 - Event, dimension, or date validation error: correct the preview configuration and preview again.
-- Permission error: repeat ORG_WORKSPACE_GATE.
-- Save API error: do not automatically retry; use `list_contents` to check whether an asset was created.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Save API error, or the session expired during the call: do not automatically retry; use `list_contents` to check whether an asset was created before calling again. Use DUPLICATE_GATE's exact name/type recovery query (never `mine_only`; `limit=0` is allowed). An item that existed before the save does not count. Call again only after fresh WRITE_APPROVAL.
 
 ## Recommended Chain
 
 ```
 (PROJECT_ID_GATE) → (SCHEMA_FIRST: list_events/list_dimensions)
-→ (ORG_WORKSPACE_GATE) → preview_retention (validation) → [WRITE_APPROVAL] → create_retention
+→ (ORG_WORKSPACE_GATE) → preview_retention (validation) → (DUPLICATE_GATE) → [WRITE_APPROVAL] → create_retention
 ```

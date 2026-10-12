@@ -2,8 +2,8 @@
 
 `create_dashboard` **places `contents` automatically, in order**. The skill does not compute placement coordinates — for a new
 layout it decides the `contents` order (the tool handles the coordinate arithmetic). To keep an existing layout (a template, a
-recreated dashboard, or `update_dashboard`), pass each item's `width`/`height`/`memo` as well; omitted sizes fall back to the
-defaults below.
+recreated dashboard, or an `update_dashboard` call that changes `contents`), pass each item's `width`/`height`/`memo`/`row` as well; omitted sizes fall back to the
+defaults below and omitted rows may merge. For `update_dashboard`, also pass text and image panels by `panel_ref`.
 
 ## Placement Rules
 

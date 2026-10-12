@@ -42,7 +42,8 @@ Returns the total user count, the estimated extracted count and its proportion, 
 
 ## On Failure
 
-- `ValidationError`: a property name or value in the condition is not in the metadata. Check with `list_segment_meta` and fix it.
+- Rejected (the message lists the available properties, values, or the period rule): a property name, value, or period
+  condition is not allowed by the metadata. Check with `list_segment_meta` and fix it.
 - `condition_details` is an empty list: only the detail query failed. The estimated count (`extract_user_cnt`) is still valid.
 
 ## Recommended Chain

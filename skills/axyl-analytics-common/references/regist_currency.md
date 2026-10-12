@@ -31,7 +31,7 @@ call was made).
 - **A change replaces the `idx`.** The server has no currency update API, so the change is performed as a delete followed by a
   re-registration (the console does the same). In the return value, `previous_idx` is the old value that is gone and `idx` is
   the new one. Do not reuse the previous `idx`.
-- If the same code is already registered, the tool blocks the registration. If you meant to change it, call again with that `idx`.
+- If the same code is already registered, the tool blocks the registration. If you meant to change it, with fresh WRITE_APPROVAL, call again with that `idx`.
 - If the target code already exists as another registration, the call is blocked before the delete, so no duplicate is created.
 - Code validation checks only the ISO 4217 format. It does not verify that the code is selectable in the console, so if you are
   unsure, check the currency configuration screen in the console first.
@@ -40,16 +40,20 @@ call was made).
 
 ## On Failure
 
-- Format error or duplicate: blocked before the call, so nothing changed. Fix the value and call again.
-- Re-registration failed during a change: the tool restores the original code. The error message contains the restored result
-  and the new `idx`.
+- Format error or duplicate: blocked before the call, so nothing changed. Fix the value and, with fresh WRITE_APPROVAL, call again.
+- `idx` not a positive integer, or not found for this company: blocked before the call, so nothing changed. Recheck the
+  `idx` with `list_currencies`.
+- Re-registration failed during a change: the tool restores the original code under a new `idx`. Recheck it with
+  `list_currencies` before any further call.
 - Recovery also failed: that currency is left deleted. Follow the guidance in the error message and register it again in the console.
+- Session expired during a change: after sign-in, recheck with `list_currencies` before any further call — the original
+  code may have been deleted.
 - Administrator privilege error: do not register. Prepare the request details to send to an Analytics administrator.
 
 ## Recommended Chain
 
 ```text
-SETTING_ACCESS_GATE → list_currencies → confirm the current list and idx
+check_analytics_admin → list_currencies → confirm the current list and idx
 → SETTING_ADMIN_GATE → WRITE_APPROVAL → regist_currency
 → confirm it took effect with list_currencies
 ```

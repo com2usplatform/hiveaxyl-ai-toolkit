@@ -13,7 +13,7 @@
 | Parameter | Required | Description |
 |---------|------|------|
 | `sdk_type` | Y | `sdk_v4` or `axyl`. `unknown` returns no events |
-| `company_cd` | Y | The company code confirmed in Phase 3 |
+| `company_cd` | Y | The company code confirmed through PROJECT_ID_GATE |
 | `event_category` | N | The category to query, one of `User`, `Gameplay`, `Revenue`, `Campaign`, `Advertisement` |
 
 ## Return Value
@@ -22,8 +22,11 @@ Returns standard events in `events` and company-specific custom candidates in `c
 count for each list. Standard events include the SDK type, collection ownership, and whether they are baseline events.
 
 - `total_count` is the number of standard GAME and AUTO events mapped to the target SDK, and `events` returns all of them.
-- `company_custom_count` is the number of company-specific custom events, and `company_custom_events` returns all of them.
+- `company_custom_count` is the number of company-specific custom events, and `company_custom_events` returns them
+  (aggregation and platform-derived events are excluded).
 - `company_custom_events` holds the company-specific candidates whose names do not collide with an active standard event.
+  Each item has only `event_name` and `event_description` (the Korean description when one exists, otherwise the default
+  description); it carries no SDK type, collection ownership, or category.
 - A company candidate colliding with a standard name is excluded from that array only. If the target SDK mapping is GAME, the standard
   candidate remains in `events`, and whether it is actually collected is confirmed through per-AppID ingestion queries and the repository's send code.
 - This exclusion exists to prevent duplicate classification in the default recommendations; it is not a policy that forbids sending the same eventName again.
@@ -37,7 +40,7 @@ count for each list. Standard events include the SDK type, collection ownership,
 ## Decision Rules
 
 - Do not guess the SDK type. Confirm `sdk_v4` or `axyl` in the repository before calling.
-- Use the `company_cd` confirmed in Phase 3, and do not guess it.
+- Use the `company_cd` confirmed through PROJECT_ID_GATE, and do not guess it.
 - The tool always returns both the GAME and AUTO standard events for the target SDK.
 - Do not filter on `is_baseline`; use it only for sorting and prioritizing the recommendation results.
 - Classify `target_collect=AUTO` as `SDK automatic collection` and do not treat it as a target for ordinary code generation.
@@ -52,6 +55,6 @@ count for each list. Standard events include the SDK type, collection ownership,
 ## Recommended Chain
 
 ```text
-Determine the SDK type → confirm Phase 3 company_cd → list_recommended_events
+Determine the SDK type → confirm company_cd (PROJECT_ID_GATE) → list_recommended_events
 → identify repository insertion points → get_event_spec / list_dimensions
 ```

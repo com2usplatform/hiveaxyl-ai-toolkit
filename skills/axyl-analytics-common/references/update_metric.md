@@ -63,6 +63,7 @@ Returns `{"metric_idx", "metric_name", "changed", "console_url", "response"}`.
 - `metric_idx` not found: nothing is saved. Confirm the idx with `list_metrics` — saving with a wrong
   one would erase the existing definition, so the tool blocks it first.
 - `percent` or `change_rate` value error: use only `"Y"` or `"N"`.
+- API error or session expiry: do not retry automatically; check with `list_metrics` whether it took effect.
 
 ## Recommended Chain
 

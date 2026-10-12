@@ -39,8 +39,8 @@ description: |
 - **Target group creation when needed:** `regist_user_group` — irreversible write requiring WRITE_APPROVAL
 - **Metric-setting cross-check:** `list_except_users` / `list_metric_filters` / `list_start_dates`
 
-For detailed arguments, returns, and permission scopes, follow the
-[tool references in axyl-analytics-common](../axyl-analytics-common/SKILL.md).
+For detailed arguments, returns, and permission scopes, use the direct tool-reference links in
+[axyl-analytics-common](../axyl-analytics-common/SKILL.md).
 `axyl-create-segment` handles any segment and snapshot creation required before `regist_user_group`.
 
 ## Reference Documents
@@ -114,8 +114,9 @@ Step 2-3. get_user_recent_info (when needed)
 ```
 
 Follow [Investigating activity history](references/activity_investigation.md) for detailed lookup and pagination.
-Do not keep paging through the entire history. Narrow the period further from the summary or ask which range the
-user wants checked.
+Do not exhaust an unrelated broad history. After narrowing to the smallest supported date range, continue the pages needed
+to answer a targeted event/property question; if the search stops before `has_more=false`, report it as incomplete and do
+not conclude that the target is absent.
 
 ### Phase 3 — Cross-check Metric Settings and Conclude
 
@@ -186,4 +187,4 @@ there is a specific reason not to.
 | Detailed activity is too large | Narrow the date and event range from the summary; ask the user to choose a range when the needed scope is unclear |
 | Latest property value is `-` | Report it as not collected, not as zero or absent |
 | Activity and metric disagree | Cross-check settings and time boundaries; leave the cause unconfirmed when it cannot be established |
-| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

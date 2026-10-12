@@ -38,8 +38,8 @@ If none of the three applies, **do not conclude** — report what was checked al
 This is rare. Suspect the following first.
 
 - **Period boundary** — the activity time has the user's timezone applied while the time inside the
-  event properties is UTC, a 9-hour difference. Around a date boundary, widen the query period by a
-  day and look again.
+  event properties is UTC, so they differ by the user's UTC offset (9 hours for KST). Around a date
+  boundary, widen the query period by a day and look again.
 - **User ID** — recheck with `check_user_exists`. It may be an ID from another project.
 
 ## When Answering with Figures

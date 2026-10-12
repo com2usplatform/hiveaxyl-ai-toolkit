@@ -7,7 +7,7 @@ event name needs no registration before logs are sent. Use this tool only to set
 categories ahead of the first log.
 
 > **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md).
-> WRITE_APPROVAL, POST_WRITE_LINK, and DUPLICATE_GATE all apply.
+> WRITE_APPROVAL and POST_WRITE_LINK apply, together with the duplicate check below.
 
 ## When to Use
 
@@ -39,7 +39,7 @@ result.** Do not assemble it yourself; use the value the tool returned (POST_WRI
 
 - **Never invent the event name (NO_GUESSING).** It is a contract with whoever sends the log and
   must match exactly, including case. If the name is not settled, ask rather than register.
-- **Check for an existing name with `list_events` first (DUPLICATE_GATE).** The tool does not block
+- **Check for an existing name with `list_events` first (duplicate check).** The tool does not block
   duplicates.
 - **Get user approval before calling (WRITE_APPROVAL).** Read back the name and description.
 - **It cannot be undone.** No delete tool is provided, so cleanup has to happen in the console.
@@ -52,11 +52,16 @@ result.** Do not assemble it yourself; use the value the tool returned (POST_WRI
 ## On Failure
 
 - `event_name` format error: use only letters, digits, and underscores.
-- Access error: check that `company_cd` is correct.
+- Access error: if `company_cd` was wrong, reconfirm it with `list_projects`; otherwise follow MCP_ACCESS_GATE (denied
+  call without `org_idx`).
+- API error, or the session expired during the call: do not retry automatically — first check with `list_events` whether
+  the event was registered.
 
 ## Recommended Chain
 
 ```text
 list_events (duplicate check) → user approval → regist_event
-→ regist_event_dimension (add attributes) → report with console_url
+→ regist_event_dimension (add attributes)
+→ for an amount attribute: user approval → update_event (price_dimension/currency_dimension)
+→ report with console_url
 ```

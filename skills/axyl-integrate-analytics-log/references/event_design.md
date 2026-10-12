@@ -173,7 +173,8 @@ Registration in list_events is not evidence that collection is happening. After 
 through repository mapping, judge in this order.
 
 1. Confirm actual ingestion over the last 7–14 days with query_adhoc. Always include the `org_idx`, `appid_groups`, and AppID
-   confirmed in Phase 3 in the query conditions.
+   confirmed in Phase 3 in the query conditions. For an AppID not yet registered in the Hive console, rule out duplicates
+   from the repository code only and record the ingestion check as `not performed`.
 2. Search the repository for Analytics.sendAnalyticsLog, sendEvent, existing wrappers, and the eventName.
 
 Run query_adhoc in the confirmed company_cd, org_idx, and appid_groups context. For a single AppID use a `filters.appId` equality

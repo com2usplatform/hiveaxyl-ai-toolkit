@@ -32,7 +32,7 @@ Scope of the check:
 - Required event fields: `event_name`, `event_category`, `description_ko`, `attributes`
 - Whether an `sdk_v4` or `axyl` SDK mapping exists
 - Conflicts or omissions between per-SDK collection ownership and the base event configuration
-- Validity of property names and ingestion-location fields
+- Property ingestion-location fields, and that property names are not empty (name format is not checked)
 
 ## Decision Rules
 

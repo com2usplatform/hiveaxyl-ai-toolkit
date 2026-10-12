@@ -19,7 +19,7 @@ its target to that set of users.
 | `appid_group` | Y | Project ID (`list_projects.appid_group`) |
 | `game_name` | Y | Game name (`list_projects.game_name`). Never guessed |
 | `name` | Y | Group name. Make it say what the group collects |
-| `segment_id` | Y | Segment idx (`list_segment_snapshots.segment_idx`) |
+| `segment_id` | Y | Segment idx: the `segment_idx` returned by `create_segment` or `create_segment_from_classification`, or `list_segment_snapshots.segment_idx` |
 | `segment_snapshot_id` | N | Snapshot idx (`list_segment_snapshots.snapshot_idx`). Omit to build from the segment alone |
 
 ## Return Value
@@ -40,18 +40,22 @@ individual group, so also mention that the new group has to be found in the list
   in the console, so do not create one freely just to run a single investigation.
 - **Reuse comes first.** Check `list_user_groups` and use an existing group when one fits.
 - Creating a segment, extracting a snapshot, and then creating a group is a heavy flow. Propose it to
-  the user and obtain approval before starting.
+  the user before starting. Each write in it needs its own WRITE_APPROVAL — approval for the segment or
+  snapshot does not cover this group.
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
-- API error: do not retry automatically. First check with `list_user_groups` whether the group was
-  actually created — a retry can create two groups with the same name, and they cannot be deleted.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- API error, or the session expired during the call: do not retry automatically. First check with `list_user_groups` whether the group was
+  actually created — a retry can create two groups with the same name, and they cannot be deleted. A same-name group that
+  existed before the call does not count.
 
 ## Recommended Chain
 
 ```text
 list_user_groups → no group for the same purpose
-→ axyl-create-segment (segment + snapshot) → WRITE_APPROVAL → regist_user_group
+→ axyl-create-segment (segment + snapshot, each with its own WRITE_APPROVAL)
+→ WRITE_APPROVAL (this group) → regist_user_group
 → get_user_group → present candidates
 ```
