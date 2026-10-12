@@ -16,7 +16,7 @@
 |---------|------|------|
 | `company_cd` | Y | Company code |
 | `org_idx` | Y | Organization idx. Used to verify access to the segment's project |
-| `segment_idx` | Y | Segment idx. The return value of `create_segment` or the `segment_idx` from `list_segment_snapshots` |
+| `segment_idx` | Y | Segment idx. The return value of `create_segment` or `create_segment_from_classification`, or the `segment_idx` from `list_segment_snapshots` |
 | `title` | Y | Snapshot name. Because several accumulate under one segment, make it **convey the point in time** (for example, `"260730_China_Users"`) |
 
 ## Return Value
@@ -34,6 +34,8 @@ Returns the target segment and project, the snapshot title, the start status, th
 - **Do not guess `segment_idx`** (NO_GUESSING). Always take it from an upstream tool's result.
   A single wrong digit can point at a different segment. The server also verifies company membership and the selected organization's access to the project.
 - **It does not return the target user count.** Check the count with `list_segment_snapshots` once `job_status="complete"`.
+- A segment made with `create_segment_from_classification` does not appear in `list_segment_snapshots`. Give the user the
+  returned `url` to check completion and the user count in the console.
 - Completion takes time. If it does not appear on an immediate re-query, wait briefly and check once more before concluding —
   and do not call this tool again in the meantime, because each call creates another snapshot.
 
@@ -41,9 +43,8 @@ Returns the target segment and project, the snapshot title, the start status, th
 
 | Situation | Response |
 |------|------|
-| `ValidationError` (company mismatch) | The `segment_idx` belongs to a different company. Recheck with `list_segment_snapshots` |
-| `ValidationError` (deleted segment) | A snapshot cannot be created for a deleted segment. Suggest creating a new one with `create_segment` |
-| API error | Check the server response. Extraction did not start |
+| Rejected for the chosen segment (another company's, or deleted) | Relay the server's message and recheck with `list_segment_snapshots`; if the segment no longer exists, suggest creating a new one with `create_segment` |
+| Other API error, or the session expired during the call | The snapshot may have started anyway. Query `list_segment_snapshots` and count only a snapshot with the approved title that was not there before the call; never report an older snapshot as the new one, and never call `create_segment_snapshot` again while unsure |
 
 ## Recommended Chain
 

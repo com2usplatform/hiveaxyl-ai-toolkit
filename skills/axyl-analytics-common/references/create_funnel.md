@@ -1,6 +1,6 @@
 # create_funnel (Save Funnel Content)
 
-> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + **WRITE_APPROVAL** are required.
+> **Prerequisite:** Follow the common rules in [`../SKILL.md`](../SKILL.md). PROJECT_ID_GATE + ORG_WORKSPACE_GATE + DUPLICATE_GATE + **WRITE_APPROVAL** are required.
 
 ## When to Use
 
@@ -41,12 +41,14 @@ Returns the saved content ID, type (`funnel`), name, and Analytics console URL.
 ## On Failure
 
 - Section or date validation error: correct the `preview_funnel` configuration and preview again.
-- Permission error: repeat ORG_WORKSPACE_GATE.
-- Save API error: do not automatically retry; use `list_contents` to check whether an asset was created.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Save API error, or the session expired during the call: do not automatically retry; use `list_contents` to check whether an
+  asset was created before calling again. Use DUPLICATE_GATE's exact name/type recovery query (never `mine_only`; `limit=0` is allowed). An item that existed before the save does not count. Call again only after fresh WRITE_APPROVAL.
 
 ## Recommended Chain
 
 ```
 (PROJECT_ID_GATE) → (SCHEMA_FIRST: list_events/list_dimensions)
-→ (ORG_WORKSPACE_GATE) → preview_funnel (validation) → [WRITE_APPROVAL] → create_funnel
+→ (ORG_WORKSPACE_GATE) → preview_funnel (validation) → (DUPLICATE_GATE) → [WRITE_APPROVAL] → create_funnel
 ```

@@ -36,7 +36,7 @@ A snapshot is a set fixed at a past point in time. As time passes, these users g
 
 ```
 Check snapshot_age_days
-  ├─ today to a few days old   → usable as is
+  ├─ today to a few days old   → a reuse candidate; show the elapsed days and let the user choose (as in Step 3 below)
   ├─ a week or more old        → state the elapsed days to the user and confirm whether to refresh
   └─ for a send + old          → refreshing with create_segment_snapshot is recommended
 ```
@@ -63,10 +63,11 @@ Check snapshot_user_cnt
 When a snapshot is needed:
 
 Step 1. Check the existing snapshots with list_segment_snapshots
-Step 2. Do the conditions match the request? (judge from conditions[].summary, never from the name)
+Step 2. Do the normalized raw conditions match the request? (summary is display-only; never judge from the name)
           └─ NO  → a new segment is needed (create_segment)
 Step 3. Is the latest snapshot usable? (snapshot_age_days)
-          ├─ YES → use it as is. Do not extract
+          ├─ YES → unless the user explicitly asked for a new one, show the elapsed days and let the user choose to
+          │        reuse it or extract a new one
           └─ NO  → [WRITE_APPROVAL] → create_segment_snapshot
 ```
 
@@ -77,7 +78,8 @@ Do not take duplicate snapshots of the same conditions. Extraction is a BigQuery
 ```
 Right after create_segment_snapshot (or create_segment with set_base_snapshot="set") returns
   (create_segment with the default set_base_snapshot="" makes no snapshot at all)
-  → job_status = "start" (extraction has only been started)
+  → job_status = "start" (extraction has only been started; create_segment returns no job_status —
+    check the base snapshot with list_segment_snapshots)
   → the target user count is unknown
 
 list_segment_snapshots also returns in-progress snapshots along with their job_status
@@ -93,7 +95,8 @@ list_segment_snapshots also returns in-progress snapshots along with their job_s
 ## Cautions When Interpreting Conditions
 
 - **Do not judge the target from the segment's name or description.** In real data, careless names are common.
-- Judge from `conditions[].summary` (for example, `"User info · Language: Simplified Chinese"`).
+- Judge identity from the normalized raw condition structure. Use `conditions[].summary` (for example,
+  `"User info · Language: Simplified Chinese"`) only to explain the target to the user.
 - With `with_labels=True` (the default), the labels are filled in. Missing labels mean the property metadata query failed, so
   interpret them yourself with `list_segment_meta` or explain using the raw values.
 - Only condition-based (`created_way="standard"`) segments are returned. Segments created by CSV upload or a direct query have no
@@ -103,8 +106,8 @@ list_segment_snapshots also returns in-progress snapshots along with their job_s
 
 | Situation | Response |
 |------|------|
-| `snapshots` is an empty list | If no extraction was requested, offer to extract. After a request, treat the empty list as pending visibility and query again later; do not call it failed or offer a retry until the service or an operator confirms that the accepted request can no longer create a snapshot. A retry requires fresh WRITE_APPROVAL |
+| `snapshots` is an empty list | If no extraction was requested, offer to extract. After a request, treat the empty list as pending visibility and query again later; do not call it failed or offer a retry until the service or an operator confirms that the accepted request can no longer create a snapshot (ask the user to confirm with the Analytics operator — no tool reports it). A retry requires fresh WRITE_APPROVAL |
 | `job_status="start"` | In progress. Advise querying again shortly. Do not re-extract. Do not report a count |
 | `segment_idx` company mismatch | It is another company's segment. Reconfirm with `list_segment_snapshots` |
 | Deleted segment | A snapshot cannot be created. Propose creating a new one with `create_segment` |
-| The snapshot never completes | Report it as pending and escalate for service/operator confirmation. Propose simplifying the conditions or period, but retry only after confirmation that the previous request can no longer create a snapshot and after fresh WRITE_APPROVAL |
+| The snapshot never completes | Report it as pending and ask the user to confirm with the Analytics operator — no tool reports it. Propose simplifying the conditions or period, but retry only after confirmation that the previous request can no longer create a snapshot and after fresh WRITE_APPROVAL |

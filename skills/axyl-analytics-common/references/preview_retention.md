@@ -6,7 +6,7 @@
 
 - To query, by cohort, the share of users who came back with a return event (for example, a re-login) after a base event (for example, a new sign-up).
 - Use it after first confirming event and filter information in the order `list_events` → `list_dimensions`.
-- **Before calling, you must obtain `org_idx`/`workspace_idx` through ORG_WORKSPACE_GATE, starting with `check_analytics_admin`.**
+- **Before calling, you must obtain `org_idx`/`workspace_idx` through ORG_WORKSPACE_GATE.**
 
 ## Parameters
 
@@ -28,6 +28,9 @@
 
 ### date_params structure
 
+For a fixed period, set `start_date_type`/`end_date_type` to `"F"` and pass `start_date`/`end_date` in
+`YYYY-MM-DD HH:MM:SS` format, together with `"start_period": "D", "start_value": 0, "end_period": "D", "end_value": 0`.
+
 For a relative period, set `start_date_type`/`end_date_type` to `"V"` and pass an integer offset from today in
 `start_value`/`end_value`. In that case, do not compute or pass `start_date`/`end_date`.
 
@@ -40,7 +43,9 @@ For a relative period, set `start_date_type`/`end_date_type` to `"V"` and pass a
 
 ### dimensions structure
 
-Each entry consists of the dimension ID and name confirmed from `list_dimensions`, plus a display alias.
+Each entry consists of the dimension ID and name confirmed from `list_dimensions(company_cd, base_event.event_name)`,
+plus a display alias. `dimension_idx` differs per event, so take it from the base event. Only the save
+(`create_retention`/`update_retention`) validates this; the preview does not, and a wrong idx silently does not group.
 
 ## Return Value
 
@@ -59,7 +64,8 @@ The actual columns and display structure vary with the `chart_type`, `display_fo
 
 - Empty result: check that `project` and the date range are correct.
 - API error: the error message includes the server response. Read the message and fix the parameters.
-- Organization or workspace authorization error: perform ORG_WORKSPACE_GATE again.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 
 ## Recommended Chain
 

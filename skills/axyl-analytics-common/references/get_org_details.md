@@ -20,25 +20,30 @@ Only an Analytics administrator can use it.
 
 ## Return Value
 
-Returns the name and description along with `all_type`, `member_all_type`, `display`, `appid_groups`, and `member_count`.
+Returns the name and description along with `all_type`, `member_all_type`, `mcp_member_all_type`, `display`,
+`appid_groups`, `member_count`, and `mcp_member_count`.
 
 | Value | Meaning |
 |---|---|
-| `all_type='Y'` | The organization accesses **every project** in the company. `appid_groups` is empty |
+| `all_type='Y'` | The organization accesses **every project** in the company. `appid_groups` does not decide access and may be empty |
 | `all_type='N'` | It accesses only the projects connected through `appid_groups` |
-| `member_all_type='Y'` | An **openly shared** organization that anyone in the company uses. There is no member roster, so `member_count` is 0 |
+| `member_all_type='Y'` | An **openly shared** organization that anyone in the company uses. There is no regular member roster; `member_count` counts only users registered individually, such as users individually allowed to use MCP |
 | `member_all_type='N'` | Only named members use it, and `member_count` is how many |
+| `mcp_member_all_type='Y'` | Every member who can use this organization is allowed to use MCP |
+| `mcp_member_all_type='N'` | Only individually enabled users may use MCP (possible in openly shared organizations too); `mcp_member_count` is how many |
 
 ## Decision Rules
 
 - **Member identities are not returned.** If a roster is needed, point the user to the organization settings screen in the console.
+- MCP-enabled member identities are also not returned; only `mcp_member_count` is provided.
 - In `appid_groups`, `exclude='Y'` marks an entry that is left out of the connection.
-- `display='N'` means the organization is not shown in the console list.
 
 ## On Failure
 
 - Administrator privilege error: do not query. Ask an Analytics administrator to check instead.
 - Ownership error: the specified `org_idx` is not an organization of that company. Recheck with `list_organizations`.
+- Organization permission denial: administrators also need MCP access in that organization, so a newly created
+  organization cannot be queried until MCP access is granted. Do not sign in again; follow MCP_ACCESS_GATE.
 
 ## Recommended Chain
 

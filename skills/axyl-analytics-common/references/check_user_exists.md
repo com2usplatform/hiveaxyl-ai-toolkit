@@ -39,11 +39,12 @@ returns.
 
 ## On Failure
 
-- Organization access error: recheck the accessible organizations with `list_organizations`.
-- Project access error: that project is not connected to the organization. Recheck with `list_projects`.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (required `user_id`) and call again.
 
 ## Recommended Chain
 
 ```text
-list_projects → list_organizations → check_user_exists → get_user_activity_summary
+list_projects → list_organizations → list_projects(company_cd, org_idx) → check_user_exists → get_user_activity_summary
 ```

@@ -69,7 +69,8 @@ the server fills them in automatically from `list_segment_meta`.
 
 Returns the saved `segment_idx`, the title, the project, a condition summary, the console URL, and the save result.
 
-- `segment_idx`: pass it straight to `create_segment_snapshot`.
+- `segment_idx`: pass it straight to `create_segment_snapshot`. If it is null, take it from `list_segment_snapshots` only
+  after matching the normalized raw condition structure (NO_GUESSING); `summary` is localized display text, not identity.
 - `conditions`: a summary of the conditions actually saved. Show it to the user as is so they can confirm it matches their intent.
 - `url`: the segment detail console link (POST_WRITE_LINK). Return it to the user. Do not assemble it yourself.
 
@@ -85,15 +86,24 @@ Returns the saved `segment_idx`, the title, the project, a condition summary, th
 
 ## On Failure
 
-- `ValidationError` (property name): a `property_category.property_name` that is not in the metadata. The message includes the list of available properties.
-- `ValidationError` (value): a value not available for a selectable property. The message includes the list of available values.
-- `ValidationError` (period): a `date_type` was attached to a property with `period_yn="N"`. Remove the period condition.
-- API error: check the server response and fix the parameters. The segment was not created.
+- Rejected before saving (the message lists the available properties, values, or the period rule): nothing was saved.
+  Do not substitute a value or remove a condition yourself. Relay the message, recheck `list_segment_meta`, and let the user
+  choose a valid replacement or explicitly remove the unsupported period condition. Then run `simulate_segment` again and
+  obtain fresh WRITE_APPROVAL before saving.
+- Any other error, or the session expired during the call: the segment may have been saved anyway. Before calling again,
+  query `list_segment_snapshots` and look for a segment with equivalent normalized raw conditions. `conditions` is a flat
+  list: regroup it by `property_group_idx`. Compare the segment's top-level `group_connection_type` (between groups); each
+  group's `property_select_type` and within-group connection (each condition's `group_connection_type`, which is the
+  input's `property_connection_type`); and each field's `property_category`, `property_name`, `value_range_type`, values,
+  date settings, and `field_connection_type`. Preserve the group/field structure; ignore labels, summaries, titles, and descriptions, and normalize only unordered multi-value sets.
+  Count only a segment that was not in the list before the save; an equivalent segment that already existed (for
+  example, when the user chose to save anyway) does not count. If one appeared, do not save
+  again; otherwise retry only after fresh WRITE_APPROVAL (fix the parameters first if the error requires it).
 
 ## Recommended Chain
 
 ```
 (PROJECT_ID_GATE) → list_segment_meta → simulate_segment (check the user count)
-→ [WRITE_APPROVAL] → create_segment
+→ list_segment_snapshots (duplicate check: equivalent normalized raw conditions) → [WRITE_APPROVAL] → create_segment
 → (only if a snapshot is wanted) [separate WRITE_APPROVAL] → create_segment_snapshot → list_segment_snapshots (confirm it completed)
 ```

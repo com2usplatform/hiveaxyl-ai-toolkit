@@ -17,7 +17,7 @@ different constraints, are as follows.
 
 | Parameter | Required | Description |
 |---|---|---|
-| `dimensions` | Y | List of dimensions to rank by. At least one |
+| `dimensions` | Y | List of dimensions to rank by. At least one. Buckets follow the "Dimension buckets" section of `preview_chart` |
 | `rank_limit` | N | Number of ranks to display. 1 or more, default 10 |
 | `rank_order` | N | `desc` (largest first, the default) or `asc` |
 | `rank_tie_mode` | N | `sequence` / `rank` / `dense` |
@@ -40,7 +40,8 @@ itself limit the number of rows returned.
 - `rank_limit` is a console display setting and does not limit the response rows themselves. For a high-cardinality dimension
   such as user ID, narrow the period and `adhoc_filters`.
 - `dimensions` needs at least one entry, and must use values confirmed from `list_dimensions`.
-- For a revenue ranking, confirm the currency per `list_currencies`.
+- For a revenue ranking (an `is_price=1` dimension on an event that also has an `is_currency=1` dimension), confirm the
+  currency with `list_currencies`: one → use it; several → ask the user; empty → `"USD"`, and disclose the fallback.
 - Do not save immediately when the query result is empty. Recheck the project, period, and configuration, and hand off to
   `create_chart_rank` only with the empty-content warning and WRITE_APPROVAL.
 
@@ -48,7 +49,8 @@ itself limit the number of rows returned.
 
 - Empty result: check the project, period, filters, and dimension cardinality.
 - Ranking validation error: fix the combination of `rank_limit`, `rank_order`, `rank_tie_mode`, and `rank_group_mode`.
-- Authorization error: perform ORG_WORKSPACE_GATE again.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 - API error: fix the offending parameter named in the server message, then query again.
 
 ## Recommended Chain

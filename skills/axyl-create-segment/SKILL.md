@@ -3,21 +3,19 @@ name: axyl-create-segment
 metadata:
   version: "1.0.0"
 description: |
-  Turns a natural-language request into segment conditions, simulates the estimated user count, saves the segment, and
-  extracts a snapshot (a user set fixed at a point in time). Adding a snapshot to an existing segment is also this
-  skill's job.
+  Designs Hive Analytics segment conditions, estimates the matching user count, saves the segment, and optionally
+  extracts a point-in-time snapshot. It also lists existing segments/snapshots and refreshes snapshots. Follow
+  axyl-analytics-common first.
 
   TRIGGER when:
   - The user asks to create a segment (for example, "create a segment of paying iOS users")
   - The user asks how many users meet certain conditions (simulation only, no save)
-  - The user asks to take or refresh a snapshot of an existing segment
-  - The user asks what segments and snapshots exist
+  - The user asks to list existing segments/snapshots or take or refresh a snapshot
 
   DO NOT TRIGGER when:
-  - The request is to view a metric split by dimension (OS, country, market) or a user ranking → axyl-drill-down-metrics
+  - The request is a metric breakdown by dimension or a user ranking → axyl-drill-down-metrics
   - The request is to create chart, funnel, retention, or dashboard content → axyl-create-content
-  - The request is only to send a push → currently unsupported
-    (this skill stops at segments and snapshots; if segment creation is also requested, complete only that part)
+  - The request is only to send a push; this skill stops at segments and snapshots
   - The request is development work unrelated to analytics
 ---
 
@@ -26,7 +24,7 @@ description: |
 > **CRITICAL — Always review the common rules in [axyl-analytics-common](../axyl-analytics-common/SKILL.md) first.**
 > **CRITICAL — `create_segment` and `create_segment_snapshot` are write operations. Never run them without WRITE_APPROVAL.**
 > **CRITICAL — Always show the estimated user count with `simulate_segment` before saving. Do not ask for approval without showing the count.**
-> **CRITICAL — Use only `list_segment_meta` results for condition property names and values (NO_GUESSING). A wrong value produces a segment matching no one, without any error.**
+> **CRITICAL — Use only `list_segment_meta` results for condition property names and values (NO_GUESSING). A selectable value not in the metadata is rejected, but a wrong range threshold is not checked and can produce a segment matching no one.**
 > **CRITICAL — Take `segment_idx` and `snapshot_idx` only from upstream tool results. Do not guess them.**
 > **CRITICAL — Show the user only the condition summary (`summary`). Do not expose internal code values such as `value_range_type`, `date_type`, or `start_value` (the display rules in axyl-analytics-common).**
 
@@ -46,7 +44,7 @@ description: |
   → [list_segment_snapshots.md](../axyl-analytics-common/references/list_segment_snapshots.md)
 
 Segment tools need `org_idx` to verify access to the target project, but because segments are not workspace assets,
-`workspace_idx` is not needed. Follow Step 1-1: confirm `org_idx` with `list_organizations(company_cd)` (add `appid_group` only when the project is already known), then take
+`workspace_idx` is not needed. Follow Step 1-1: confirm `org_idx` with `list_organizations(company_cd, appid_group)` using the candidate project, then take
 `appid_group` and `game_name` from the **same row** of `list_projects(company_cd, org_idx)`.
 
 ## Reference Documents
@@ -60,38 +58,45 @@ Segment tools need `org_idx` to verify access to the target project, but because
 
 ### Prerequisite — Review the common rules
 
-PROJECT_ID_GATE, SCHEMA_FIRST, WRITE_APPROVAL, and NO_GUESSING from axyl-analytics-common apply.
+PROJECT_ID_GATE, SCHEMA_FIRST (for new conditions), WRITE_APPROVAL, and NO_GUESSING from axyl-analytics-common apply.
 Workspace selection does not apply, but pass every segment tool an `org_idx` whose access to the target project has been verified.
 
 ### Phase 0 — Classify the request
 
 ```
-Split the request three ways.
+Split the request four ways.
 
-A. Create a segment from new conditions  → Phase 1 → 2 → 3 → 5
-B. Only want the user count (no save)    → Phase 1 → 2, then stop
+A. Create a segment from new conditions   → Phase 1 → 2 → 3 → optionally 4 → 5 if extracting
+B. Only want the user count (no save)     → Phase 1 → 2, then stop
 C. Take a snapshot of an existing segment → Phase 1 → 4 → 5
+D. List existing segments and snapshots  → Phase 1 (Step 1-1 only) → list_segment_snapshots, then stop
 ```
 
-If the conditions are unclear, ask the user here. Do not proceed on a guess.
+For A or B, if the conditions are unclear, ask the user here. Do not proceed on a guess.
 For decomposition examples, see [references/condition_patterns.md](references/condition_patterns.md).
 
 ### Phase 1 — Gates and schema (axyl-analytics-common)
 
 ```
 Step 1-1. PROJECT_ID_GATE       → confirm company_cd, then org_idx and appid_group / game_name
-                                  → list_organizations(company_cd), adding appid_group only when the project is already known:
+                                  → list_projects for a candidate appid_group, then list_organizations(company_cd, appid_group):
                                     one candidate → use it;
-                                    several → show them all and wait for the user's choice ⛔
+                                    several → show them all and wait for the user's choice ⛔;
+                                    none → follow PROJECT_ID_GATE's "No organization for the project" ⛔
                                   → list_projects(company_cd, org_idx): take appid_group and game_name
-                                    from the same row
-Step 1-2. SCHEMA_FIRST          → list_segment_meta(company_cd, org_idx, appid_group)
+                                    from the same row. If the project is not in them, return to organization selection
+Step 1-2. For A or B, SCHEMA_FIRST → list_segment_meta(company_cd, org_idx, appid_group)
                                   → the usable property_category / property_name
                                   → value_type (enum: a list of selectable values / range: a range input)
                                   → period_yn (only Y properties can carry a period condition)
 ```
 
-If the property you want is not in the metadata, that condition cannot be built. Propose an alternative property or stop.
+For C or D, skip Step 1-2 because no new conditions are being designed. For D, call
+`list_segment_snapshots(company_cd, org_idx, appid_group)`, present each segment's condition summary and URL together
+with each snapshot's status, age, user count when complete, and URL, then stop without requesting WRITE_APPROVAL.
+
+For A or B, if the property you want is not in the metadata, that condition cannot be built. Propose an alternative
+property or stop.
 
 ### Phase 2 — Simulation (required before saving)
 
@@ -128,12 +133,16 @@ Shall we proceed as is, or adjust the conditions?
 ```
 
 - Ground each proposed adjustment in the condition that **actually narrowed the scope** in `condition_details`. Do not build it on a hunch.
+- Omit A when the count is zero — a zero-user segment is not saved.
 - If the count is excessive, propose the opposite — adding conditions or shortening the period.
 - Do not set thresholds yourself. Whether "N users is too few" depends on the purpose, so present the figure and leave the judgment.
 
 ### Phase 3 — Save the segment (definition only)
 
 ```
+Step 3-0. Duplicate check: list_segment_snapshots(company_cd, org_idx, appid_group)
+            → compare the normalized raw condition structure; if an equivalent segment exists, show its summary and url and let the user
+              choose to reuse it or save anyway
 Step 3-1. [WRITE_APPROVAL] Wait for explicit approval to save ⛔
             (ask only after presenting the count and conditions from Phase 2)
 Step 3-2. Call create_segment → collect segment_idx
@@ -150,14 +159,16 @@ Step 3-3. Show the user the returned conditions (summary sentence) and url (cons
 
 ```
 Step 4-1. For an existing segment, call list_segment_snapshots(company_cd, org_idx, appid_group)
-            → identify which segment it is from conditions[].summary (never judge from the name)
+            → identify it from the normalized raw condition structure; use conditions[].summary only for display
             → check the existing snapshots' job_status / snapshot_age_days / snapshot_user_cnt
-            → if a usable recent snapshot already exists, use it and stop (no unnecessary extraction)
+            → if a recent snapshot exists and the user did not explicitly ask for a new one, show its elapsed days and let
+              the user choose to reuse it or extract a new one (an explicit request for a new snapshot goes to Step 4-2)
 Step 4-2. [WRITE_APPROVAL] Wait for explicit approval: "Shall we create a snapshot as of now?" ⛔
             - explain that a snapshot freezes the users who currently match these conditions
             - even a segment just created in Phase 3 is asked again here, with no exception
 Step 4-3. create_segment_snapshot(company_cd, org_idx, segment_idx, title)
             - title: make the point in time clear (for example, "260730_logged_in_today")
+            - before the call, note the segment's existing snapshots (from Step 4-1) to tell the new one apart later
 ```
 
 For the judgment criteria, see [references/snapshot_policy.md](references/snapshot_policy.md).
@@ -166,12 +177,16 @@ If the user does not want a snapshot, leave the segment definition and stop — 
 ### Phase 5 — Confirm completion
 
 ```
-Check that snapshot's job_status with list_segment_snapshots.
+Check that snapshot's job_status with list_segment_snapshots. The new snapshot is the one the call returned, or a snapshot
+with the approved title that was not among the existing ones noted before the call. Never report an older snapshot's count
+or link as the new one; if none matches, treat it as "not in the list".
+(For a segment made from a user classification, give the user the returned url to check in the console instead.)
   ├─ "complete" → return snapshot_idx / snapshot_user_cnt to the user
   ├─ "start"    → extraction is in progress. Advise querying again shortly (do not re-extract)
   └─ not in the list → right after the call, wait briefly and check once more (do not call create again);
                        still absent → leave it pending and advise checking again later; retry only after
-                       service/operator confirmation and a fresh WRITE_APPROVAL
+                       service/operator confirmation (ask the user to confirm with the Analytics operator — no tool
+                       reports it) and a fresh WRITE_APPROVAL
 ```
 
 - **POST_WRITE_LINK**: the tools return a `url` for both segments and snapshots. Include the link when reporting completion.
@@ -185,21 +200,25 @@ Check that snapshot's job_status with list_segment_snapshots.
 ## Full Chain
 
 ```
-[Classify the request]
-(PROJECT_ID_GATE) → list_segment_meta (SCHEMA_FIRST)
+[Classify the request] → PROJECT_ID_GATE
   │
   ├─ A. New segment
-  │     simulate_segment (once) → [present the count · confirm whether to adjust] ⟲ re-call only if the user chooses
+  │     list_segment_meta (SCHEMA_FIRST)
+  │     → simulate_segment (once) → [present the count · confirm whether to adjust] ⟲ re-call only if the user chooses
+  │     → list_segment_snapshots (duplicate check: equivalent normalized raw conditions)
   │     → [WRITE_APPROVAL: save] → create_segment (definition only)
-  │     → [WRITE_APPROVAL: snapshot] → create_segment_snapshot
-  │     → list_segment_snapshots (check job_status)
+  │     → [optional, separately approved snapshot] create_segment_snapshot
+  │        → list_segment_snapshots (check job_status)
   │
   ├─ B. Count only
-  │     simulate_segment → present the result and stop (no saving)
+  │     list_segment_meta (SCHEMA_FIRST) → simulate_segment → present the result and stop (no saving)
   │
-  └─ C. Snapshot of an existing segment
-        list_segment_snapshots (check conditions and freshness) → [WRITE_APPROVAL: snapshot]
-        → create_segment_snapshot → list_segment_snapshots (check job_status)
+  ├─ C. Snapshot of an existing segment
+  │     list_segment_snapshots (check conditions and freshness) → [WRITE_APPROVAL: snapshot]
+  │     → create_segment_snapshot → list_segment_snapshots (check job_status)
+  │
+  └─ D. List existing segments and snapshots
+        list_segment_snapshots → present condition summaries, status/count/age, and returned URLs → stop
 ```
 
 ---
@@ -214,7 +233,7 @@ Check that snapshot's job_status with list_segment_snapshots.
 | Count is low or high | Arbitrarily changing conditions and re-simulating | Present the result and get a choice: "Would you like to adjust the conditions?" |
 | Adjusting conditions | Changing a threshold or period without user confirmation | Present the change, get approval, then re-call once with those conditions |
 | Displaying a proportion | Converting `0.0004` to "0.04%" | Write the value as `%` as given (0.0004%) |
-| Choosing a segment | Judging the target from the name and description alone | Judge from `conditions[].summary` (the actual conditions) |
+| Choosing a segment | Judging the target from the name, description, or localized `summary` alone | Match the normalized raw condition structure; use `summary` only for display |
 | `segment_idx` | Guessing or inventing it | Use the `create_segment` return value or a `list_segment_snapshots` result |
 | Old snapshot | Using it without checking the elapsed days | Check `snapshot_age_days` and propose a refresh if needed |
 | Right after a snapshot | Reporting a definite user count | Report the count after confirming `job_status='complete'` |
@@ -224,7 +243,7 @@ Check that snapshot's job_status with list_segment_snapshots.
 | After saving or extracting | Reporting only `segment_idx` with no link | Return the `url` the tool gave alongside (POST_WRITE_LINK) |
 | Links | Assembling the URL yourself | Use the tool's returned `url` as is |
 | Saving tokens | Using `with_labels=false` for a user-facing query | Keep `with_labels` at its default (true) — turning it off leaves labels and summaries empty, with only raw values |
-| Period condition | Specifying `date_type` on a `period_yn="N"` property | Check `period_yn` in the metadata and remove the period condition |
+| Period condition | Specifying `date_type` on a `period_yn="N"` property | Explain that the property does not support a period, let the user choose whether to remove it or change the property, then re-simulate the chosen conditions |
 
 ---
 
@@ -233,14 +252,13 @@ Check that snapshot's job_status with list_segment_snapshots.
 | Situation | Response |
 |------|------|
 | The property you want is not in the metadata | Propose an alternative property, or explain that "a segment cannot be built with that condition" and stop |
-| `ValidationError` (property name or value) | Choose from the available list in the message and retry. Do not edit arbitrarily |
-| `ValidationError` (period condition) | It is a `period_yn="N"` property. Clear `date_type` and retry |
+| A condition is rejected (property, value, or period) | Do not substitute values or drop conditions yourself. Relay the server's message, recheck the available properties and values with `list_segment_meta`, let the user choose, run `simulate_segment` with the chosen conditions, and obtain WRITE_APPROVAL again before saving |
 | Simulated count is zero | Do not save. **Propose** relaxing conditions or widening the period **and get a choice** (do not re-call arbitrarily) |
 | Simulated count is excessive | State the size and **propose** adding conditions or shortening the period. Do not change conditions without approval |
 | `condition_details` is an empty list | Only the detail query failed. The estimated count is still valid, so proceed with it |
 | `snapshots` is an empty list | No snapshot yet. Right after an extraction request, re-check once before concluding; if none was requested, offer to extract. Never re-call `create_segment_snapshot` while unsure |
 | `job_status="start"` | Extraction is in progress. Advise querying again shortly. Do not report a count or re-extract |
 | No condition labels | The property metadata query failed. Explain with the raw condition values, or interpret them yourself with `list_segment_meta` |
-| `segment_idx` company mismatch | It is another company's segment. Reconfirm with `list_segment_snapshots` |
-| Deleted segment | A snapshot cannot be created. Propose creating a new one with `create_segment` |
-| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |
+| `create_segment_snapshot` is rejected for the chosen segment | Relay the server's message and reconfirm the segment with `list_segment_snapshots`; if it no longer exists, propose creating a new one with `create_segment` |
+| `create_segment` fails, or the session expires during the call | The segment may have been saved. Before calling again, check `list_segment_snapshots` for a segment with equivalent conditions that was not in the Step 3-0 list (an equivalent segment that already existed does not count); save again only if none exists, with fresh WRITE_APPROVAL |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

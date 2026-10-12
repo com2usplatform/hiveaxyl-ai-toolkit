@@ -7,7 +7,8 @@ description: |
   session, company scope, menu access and action permission, prerequisites, write confirmation, and where the
   per-feature Console guides live. The per-feature operations — project/app, app meta, login settings, security
   key, usage restriction, user lookup, TCB settings — are served by the hive-axyl MCP itself (its tools plus its
-  documentation guides), not by separate skills, so read the matching MCP-served guide together with these rules.
+  documentation guides), so read the matching MCP-served guide with these rules (TCB: also the
+  axyl-tcb-function skill).
 
   TRIGGER when:
   - Any Hive Axyl Console operation or lookup is requested through the hive-axyl MCP server — project/app,
@@ -97,6 +98,8 @@ Do not implement or judge Console behavior from memory — read the current guid
 
 ## Common Error Handling
 
+A result marked `isError: true` means the request was not confirmed as done — a failed or unverifiable call, not a broken connection. Its body still carries `error`, a `reason` code where one applies, and a `hint` or `guidance` with the next step; follow it. A result without `isError` can still be a partial success, so read it before reporting.
+
 | Situation | Response |
 |------|------|
 | Session missing/invalid (`console session is no longer valid`) | Tell the user to re-authenticate the MCP connection; cannot retry without user action. |
@@ -104,4 +107,10 @@ Do not implement or judge Console behavior from memory — read the current guid
 | Write refused (`action_denied`) | The account can view but lacks the action (Edit/Delete/Approve). Name the action to request; do not retry. |
 | Company not selected / wrong company | Confirm the company with `list_my_companies` and `select_company`; the default company may carry no permissions. |
 | Prerequisite missing (no project, no app meta, …) | Offer to create the prerequisite and confirm, then continue. |
-| Downstream Console API error | Report that the operation could not complete and why (or that it may be retried later). Never fabricate success. |
+| `reason: downstream_unavailable` | A Console service was temporarily unreachable. Retry later, as the `hint` says; tell the user if it keeps failing. |
+| `reason: outcome_unknown` | A write may already have been applied. Report neither success nor failure, and do not repeat it blindly: re-read the resource with the matching `get_*`/`list_*` tool. Retry only if the change is absent, and only after explicit confirmation again (WRITE_CONFIRM). |
+| `reason: invalid_argument` | The input was rejected. Fix the argument the message names and call again; ask the user when the right value is unclear. |
+| `reason: unexpected_error` | Returned only by read tools; an unexpected failure of a write tool is reported as `outcome_unknown`. For a read, retry once; if it fails the same way, stop and report it to the user. If a write ever returns it, handle it as `outcome_unknown`. |
+| Partial success (`failed`/`failedCount`, `partialFailure`, `failCount`/`failedTargets`, or `verification: unavailable`/`mismatch` with `notApplied`) | Not an error: some items were applied. Report applied and failed items separately, and retry only the failed items after confirmation — never redo applied ones. |
+| `register_axyl_usage_restrictions` / `release_axyl_usage_restrictions` | These can return `registered`/`released: true` even when every target failed. Judge the result by `successCount`, `failCount`, and `failedTargets`. |
+| Other Console API error | Report that the operation could not complete and why. Never fabricate success. |

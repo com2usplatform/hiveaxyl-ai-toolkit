@@ -37,7 +37,9 @@ value list was truncated.
 
 ## On Failure
 
-- Empty result or `ValidationError`: `appid_group` is most likely wrong. Reconfirm it with `list_projects`.
+- `ValidationError`: a wrong `appid_group` or an unsupported `lang`. Reconfirm `appid_group` with `list_projects`.
+- Empty list: a `property_category` filter matched nothing (check the category).
+- A project with no property metadata raises an error instead; segments cannot be built for it yet.
 
 ## Recommended Chain
 

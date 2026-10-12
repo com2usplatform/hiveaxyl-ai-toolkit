@@ -40,11 +40,14 @@ Returns `{"user_id", "appid_group", "start_date", "end_date", "page", "size", "c
 
 ## Decision Rules
 
-- **Do not page through everything.** When there are many entries, narrow the range with the per-date
-  items in the summary, or ask the user which range to look at.
+- **Do not exhaust an unrelated broad history.** First narrow the range with the per-date items in the summary.
+  After it is narrowed to the smallest supported date range, a targeted question about a specific event or property must
+  continue page by page until the evidence is found or `has_more=false`. If the remaining volume is impractical, stop and
+  report that the search is incomplete; ask for a narrower date or more identifying detail. Never conclude that the target
+  event or property is absent from only the first page.
 - `properties` uses camelCase keys (`productId`, `serverId`) while the top-level fields are snake_case.
-- `activity_date_time` has the user's timezone applied and `properties.dateTime` is UTC — a 9-hour
-  difference that **can change the date** (for example, `2026-01-01 06:00:00` KST = `2025-12-31 21:00:00` UTC).
+- `activity_date_time` has the user's timezone applied and `properties.dateTime` is UTC — they differ by the
+  user's UTC offset (9 hours for KST), which **can change the date** (for example, `2026-01-01 06:00:00` KST = `2025-12-31 21:00:00` UTC).
   Answer based on `activity_date_time`.
 - Airbridge events carry nested objects (`deviceAttributes`, `touchpointAttributes`, and others) and
   are far larger than game events. Quote only the keys you need.
@@ -53,7 +56,9 @@ Returns `{"user_id", "appid_group", "start_date", "end_date", "page", "size", "c
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (required `user_id`; dates as `YYYY-MM-DD`) and call again.
 - Empty result: there was no activity in that period. Confirm the user exists with `check_user_exists`.
 
 ## Recommended Chain

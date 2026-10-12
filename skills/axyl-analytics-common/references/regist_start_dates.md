@@ -17,7 +17,7 @@ Do not use it to exclude a single sample from a released, live project. Use `reg
 | Parameter | Required | Description |
 |---------|------|------|
 | `project_id` | Y | One `list_projects.appid_group` value. Not an AppID |
-| `start_date` | Y | `YYYY-MM-DDTHH:mm:ss` in the organization's time zone |
+| `start_date` | Y | `YYYY-MM-DDTHH:mm:ss` in the company's time zone |
 | `company_cd` | Y | Company code confirmed from `list_projects` |
 | `org_idx` | Y | Organization idx confirmed through SETTING_ACCESS_GATE, with write permission verified through SETTING_ADMIN_GATE |
 
@@ -34,17 +34,20 @@ In an actual call, use the launch or aggregation start time confirmed with the u
 - Query the current value with `list_start_dates` first.
 - If the existing start date already matches the value the user confirmed, do not call the registration tool.
 - Do not arbitrarily use the current time or the ETL send time as the start date. Confirm with the user the actual
-  aggregation start time and that it is in the organization's time zone.
+  aggregation start time and that it is in the company's time zone.
 - Changing the start date has a retroactive effect on the project's entire metric aggregation scope. Show the existing value,
   the new value, and the scope of impact, then obtain explicit approval.
-- The server API replaces the organization's entire start-date configuration, but this tool reads the existing list,
+- The server API replaces the company's entire start-date configuration, but this tool reads the existing list,
   updates only the target project, and resends the whole set. If reading the existing list fails, do not proceed with the registration.
 - After the call, recheck the target project's value with `list_start_dates`. Do not retry failures automatically.
 
 ## On Failure
 
-- Date format error: fix it to `YYYY-MM-DDTHH:mm:ss` in the organization's time zone.
-- Administrator or project access error: perform SETTING_ACCESS_GATE and SETTING_ADMIN_GATE again.
+- Date format error: fix it to `YYYY-MM-DDTHH:mm:ss` in the company's time zone.
+- Administrator privilege error: do not register. Prepare the request details to send to an Analytics administrator.
+- Project access error: treat the `org_idx` as unverified and follow MCP_ACCESS_GATE (denied call with `org_idx`),
+  resuming SETTING_ACCESS_GATE at step 3. Before calling again through another organization, recheck with
+  `list_start_dates` and obtain WRITE_APPROVAL again.
 - Failure reading the existing list: do not call the full-replacement API.
 - API error: do not retry automatically — first check with `list_start_dates` whether it actually took effect.
 

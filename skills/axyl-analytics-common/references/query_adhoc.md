@@ -16,8 +16,8 @@
 | Parameter | Required | Description |
 |---------|------|------|
 | `company_cd` | Y | The company code confirmed through PROJECT_ID_GATE |
-| `org_idx` | Y | Organization idx. Verifies access to all of the `appid_groups` below |
-| `appid_groups` | Y | The list of project IDs confirmed with `list_projects`. 1–50 entries |
+| `org_idx` | Y | Organization idx. Confirm it from `list_organizations(company_cd, appid_group)`. Verifies access to all of the `appid_groups` below |
+| `appid_groups` | Y | The list of project IDs confirmed with `list_projects(company_cd, org_idx)`; each must be reachable by that `org_idx`. 1–50 entries |
 | `event_name` | Y* | The event name confirmed from `list_events`. *Can be omitted only with `dimension_names` — then every event of the project is aggregated |
 | `start_date` | Y | The KST start date to query, `YYYY-MM-DD` |
 | `end_date` | Y | Same format as `start_date`. Includes that entire KST end date |
@@ -68,7 +68,8 @@ With `dimension_names`, it returns `{"event_rows", "dimensions", "missing_dimens
 
 - **Use only the allowed top-level columns in `filters`.** Do not pass event properties or storage-path expressions as filters —
   check them in the returned result instead.
-  - A dimension whose `list_dimensions` `attribute_source` is `null` → a top-level column, so it can be used in `filters`.
+  - A dimension whose `list_dimensions` `attribute_source` is `null` → a top-level column. It can be used in `filters` only
+    if it is one of the five allowed keys (`identifierProvider`, `userId`, `deviceId`, `appId`, `appIdGroup`).
   - A dimension whose `attribute_source` is `"hiveAttributes"` / `"eventAttributes"` → do not put it in `filters`. Read the value from the returned `attributes`.
 - All `filters` values are compared as strings. Pass them as strings even for numeric columns.
 - For a single AppID use `filters={"appId":"..."}`; for several use `app_ids=[...]`. Do not call once per AppID, and do not
@@ -107,7 +108,8 @@ With `dimension_names`, it returns `{"event_rows", "dimensions", "missing_dimens
   2. Quarantine — a format error kept it out of the normal store. The quarantine criteria follow the quarantine items defined in the
      SDK log send rules of the `axyl-integrate-analytics-log` skill
   3. Ingestion lag — it goes through ETL, so it may not be there yet right after sending
-- `Unrecognized name` error: an `attributes` sub-property name was put in `filters`. Switch to a top-level column, or query without the filter and check the result.
+- `filters` accepts only `identifierProvider`, `userId`, `deviceId`, `appId`, and `appIdGroup`; any other key is rejected before
+  the query. Filter other properties from the raw result instead.
 - If there is still no result, report the state after the retry limit as it stands. Do not assume it was ingested.
 
 ## Recommended Chain
@@ -115,7 +117,7 @@ With `dimension_names`, it returns `{"event_rows", "dimensions", "missing_dimens
 ```
 [Ingestion check] run_etl_simulation(org_idx, dry_run=false, confirmation_token=<value returned by the dry-run>)
                   → query_adhoc → (if absent) check quarantine
-[Rule out dupes]  list_projects (confirm project and AppID) → query_adhoc(org_idx, appid_groups, app_ids=[...]) → event recommendation
+[Rule out dupes]  PROJECT_ID_GATE (organization scope) → query_adhoc(org_idx, appid_groups, app_ids=[...]) → event recommendation
 [Check property]  list_dimensions (check attribute_source) → query_adhoc(dimension_names=[...]) → value distribution
 [Code values]     query_adhoc(event_name omitted, last 14 days, dimension_names=["_dataSource"])
                   → select an event under custom_sdk (v4) or axyl_custom_sdk (Axyl)

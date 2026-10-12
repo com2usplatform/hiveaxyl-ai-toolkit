@@ -33,7 +33,8 @@ Use `use_cases` and `importance` as recommendation evidence. `dashboard_id` and 
 must never be passed as `template_idx`, `dashboard_idx`, or `content_idx`.
 
 - When the genre is confirmed but BM is unknown, omit `bm` and label the result as genre-based and BM-independent.
-- Use `include_contents=false` to narrow dashboard candidates, then re-query selected candidates with content.
+- Use `include_contents=false` to narrow dashboard candidates, then query again with `include_contents=true` and use only
+  the selected ones (individual dashboards cannot be selected in the query).
 - Recommendation results are design proposals; check template mappings and data readiness separately.
 
 ## On Failure
@@ -47,6 +48,6 @@ must never be passed as `template_idx`, `dashboard_idx`, or `content_idx`.
 ```text
 list_onboarding_categories → confirm genre/BM
 → list_recommended_dashboards(include_contents=false)
-→ selected recommendations with include_contents=true
+→ include_contents=true again, using only the selected recommendations
 → template and data-readiness checks
 ```

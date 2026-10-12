@@ -30,7 +30,8 @@ company-level most recent ingestion time `last_data_date_kst`.
 
 - Do not guess or invent `event_idx`/`event_name`.
 - If a required event is not in the list, judge it `NOT_READY / EVENT_NOT_DEFINED`. Events register automatically
-  on their first log, so this means the log has never arrived — the fix is log integration, not `regist_event`.
+  on their first log, so this usually means the log has never arrived — the fix is log integration, not `regist_event`.
+  An event hidden in the console is also left out of this list; ask the user to check the console before concluding.
 - If `last_data_date_kst` is `null` or older than 14 days, judge it `NOT_READY / NO_RECENT_DATA` and skip property and raw
   ingestion queries. This does not confirm that the log was never implemented, nor does it exclude the content from recommendations.
 - If the event name is ambiguous or there are several candidates, show the list and ask the user to choose.

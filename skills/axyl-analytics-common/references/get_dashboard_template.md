@@ -16,32 +16,36 @@ Retrieves one platform dashboard template selected from `list_dashboard_template
 |---|---|---|
 | `company_cd` | Y | Company code confirmed by PROJECT_ID_GATE |
 | `template_idx` | Y | Dashboard template ID from `list_dashboard_templates` |
-| `lang` | N | Translation language. Default: `ko` |
+| `lang` | N | Translation language: `ko`, `en`, `ja`, `zh-TW`, or `th`. Default: `ko` |
 
 ## Return Value
 
-Returns dashboard name, description, global date/filter settings, and ordered `contents`. Each content cell includes
-its template ID, type, chart type, row/order, size, and optional memo. After joining the list metadata, if any child
+Returns dashboard name, description, global date/filter settings, and ordered `contents`. Each cell includes
+its template ID, `cell_type` (`content`|`text`|`image`), `content_name`, type, chart type, row/order, size, optional memo,
+and `content` (the body of a text cell or the URL of an image cell; null for a content cell). After joining the list metadata, if any child
 metadata field is null and `content_idx` exists, the server directly looks up that child template and fills the null fields.
 
 ## Decision Rules
 
 - `contents[]` is ordered and includes template content IDs and layout sizes.
-- A memo cell can have `content_idx=null`; do not interpret it as content.
+- A `text` or `image` cell has `content_idx=null`; do not interpret it as content.
 - `contents[].content_idx` is a content **template** ID. Use it only with `get_content_template`.
 - For every `cell_type=content` cell with a non-null `content_idx`, call `get_content_template` before designing or
   judging feasibility. The child detail contains the actual content type, chart type, and `params` contract.
 - If `content_name`, `content_type`, or `chart_type` is null while `content_idx` exists, look up that child directly
   and fill the null field. A field that remains null is **not by itself** evidence that the child was deleted, has no
   data, or cannot be created.
-- `width`/`height` can be passed to `create_dashboard` per item to keep the template's layout; omit them for default sizes.
+- `width`/`height`/`memo`/`row` can be passed to `create_dashboard` per item to keep the template's layout; omit them for default sizes.
+- The template's global filters keep the platform's dimension idx (they are not converted to this company's). Check each
+  filter's dimension and values before designing with them or passing them to `create_dashboard`.
 
 ## On Failure
 
 - Missing template: return to `list_dashboard_templates` and select a valid ID.
 - Member name/type/chart type is null: call `get_content_template` with that member's `content_idx`. If the direct
   lookup also fails, report `child template detail unavailable`; do not infer a name or convert it into a data-readiness result.
-- Authentication or API error: follow common authentication handling and report the server message.
+- Authentication or API error: for an expired session follow MCP_CONNECTION_GATE, for a denial follow MCP_ACCESS_GATE, and
+  report the server message.
 
 ## Recommended Chain
 

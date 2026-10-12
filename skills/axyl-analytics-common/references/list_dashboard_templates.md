@@ -14,7 +14,7 @@ Lists platform dashboard templates for a confirmed company.
 | Parameter | Required | Description |
 |---|---|---|
 | `company_cd` | Y | Company code confirmed by PROJECT_ID_GATE |
-| `lang` | N | Translation language. Default: `ko` |
+| `lang` | N | Translation language: `ko`, `en`, `ja`, `zh-TW`, or `th`. Default: `ko` |
 
 ## Return Value
 
@@ -34,7 +34,8 @@ solely because genre/BM are unknown.
 ## On Failure
 
 - Empty result: report that no platform template was returned; do not fabricate one or substitute a catalog ID.
-- Authentication or API error: follow common authentication handling and report the server message.
+- Authentication or API error: for an expired session follow MCP_CONNECTION_GATE, for a denial follow MCP_ACCESS_GATE, and
+  report the server message.
 
 ## Recommended Chain
 

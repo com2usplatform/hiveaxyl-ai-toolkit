@@ -32,15 +32,22 @@ Storage is one row per project and per value, so two projects with three values 
   would filter nothing, so if it is not in the list the tool raises an error with the candidates instead of registering.
 - If the same combination (project + type + value) already exists, the call is blocked before registration. The server does
   not prevent duplicates, so the same value would otherwise pile up as extra rows.
-- **Editing and deletion are not provided.** The console has no edit function either. To remove a mistaken registration, delete it in the console.
-- A registration affects every metric calculation. Present the target organization, projects, type, and values along with the
-  impact, and obtain approval first.
+- **Editing and deletion are not provided.** The console has no edit function either. To remove a mistaken or unwanted
+  registration, delete it in the console.
+- A registration affects every metric calculation of those projects in every organization. Present the target projects (the
+  organization is used only for authorization), type, and values along with the impact, and obtain approval first.
 
 ## On Failure
 
-- Value not in candidates: pick a correct value from the candidate list in the error message. Nothing was registered.
-- Duplicate combination: it is already registered. No further registration is needed.
-- Project access error: that project does not belong to the organization. Perform SETTING_ACCESS_GATE again.
+- Value not in candidates: nothing was registered. For `appId`, take values from the project's `app_id_list` in
+  `list_projects`; for `serverId`, confirm the values with the user (the error lists at most 10 candidates).
+- Duplicate combination: nothing was registered, including the other values in the call. Remove the listed combinations
+  and, with fresh WRITE_APPROVAL, call again with the rest.
+- Project access error: that project does not belong to the organization. Treat the `org_idx` as unverified and follow
+  MCP_ACCESS_GATE (denied call with `org_idx`), resuming SETTING_ACCESS_GATE at step 3. Before calling again through
+  another organization, recheck with `list_metric_filters` and obtain WRITE_APPROVAL again.
+- API error, or the session expired during the call: do not retry automatically — first check with `list_metric_filters`
+  whether it was registered.
 - Administrator privilege error: do not register. Prepare the request details to send to an Analytics administrator.
 
 ## Recommended Chain

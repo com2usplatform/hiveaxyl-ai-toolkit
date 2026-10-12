@@ -89,7 +89,9 @@ Returns `{"appid_group", "start_date", "end_date", "max_move", "move", "moved_us
   combination cannot occur, so call again with a different path.
 - `movers.count` of 0 means no user moved along that path. Check the matching `user_cnt_*` cell in
   `move` first to confirm the path itself is right.
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (required `appid_group`; dates as `YYYY-MM-DD`, `end_date` not before `start_date`; `limit` 1–100) and call again.
 
 ## Recommended Chain
 

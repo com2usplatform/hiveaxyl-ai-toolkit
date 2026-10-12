@@ -22,14 +22,14 @@ Updates a saved funnel (`content_type='funnel'`). **This is a write.**
 | `content_name` | N | New name |
 | `content_description` | N | New description |
 | `project` | N | New target project list. **A funnel uses only the first entry** (single-project content) |
-| `chart_type` | N | New chart type (`table`, `line`) |
+| `chart_type` | N | New chart type (`table`, `column`, `line`, `funnel`) |
 | `date_params` | N | New period. Same format as `preview_funnel` |
 | `sections` | N | New step list. Same format as `preview_funnel` |
-| `compare_type` | N | Comparison basis |
-| `standard_days` | N | Standard days |
-| `tracking_days` | N | Tracking days |
-| `convert_type` | N | Conversion display mode |
-| `user_display_type` | N | User display mode |
+| `compare_type` | N | `"prev"` (versus the previous step) \| `"first"` (versus the first step) |
+| `standard_days` | N | Base period in days (integer) |
+| `tracking_days` | N | Tracking period in days (integer). Counts a conversion only if the next step occurs within this window |
+| `convert_type` | N | `"y"`\|`"n"`. `"y"` includes step-1 conversions in the steps after step 1 as well |
+| `user_display_type` | N | `"percent"`\|`"count"` |
 
 **At least one** field to change is required.
 
@@ -76,6 +76,7 @@ Same shape as `update_chart`, with `content_type` of `"funnel"`.
 | `sections` passed as an empty list | A funnel needs steps |
 | Wrong content type | Use the tool for that type |
 | Project outside the organization's scope | Check with `list_projects(company_cd, org_idx)` |
+| API error or session expiry | Do not retry automatically; check with `get_content` whether it took effect |
 | Content created by someone else | A workspace member can only edit **content they created**. If `get_content.permission` is not `EDITOR` the save is rejected — ask the user whether to make a copy or request the change from the author |
 
 ## Recommended Chain

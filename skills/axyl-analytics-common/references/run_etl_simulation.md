@@ -30,7 +30,9 @@ HTTP call is used for verification only.
 | `retry_interval_sec` | N | Wait between retries, in seconds. 1–30, default 10 |
 | `confirmation_token` | Conditional | Required for an actual send. The short-lived, single-use token returned by the identical dry-run |
 
-Do not put required properties or reserved words in `event_attribute`. In axyl-integrate-analytics-log you may add the UUID
+Do not put required properties or reserved words in `event_attribute`. Property names must match `^[A-Za-z][A-Za-z0-9_]*$`;
+required names (including `appIdGroup`) and the reserved words `attributes`, `eventAttributes`, `hiveAttributes`, `category`,
+and `dataSource` are rejected regardless of case. `event_time` must be within 31 days before or after the current time. In axyl-integrate-analytics-log you may add the UUID
 string `guid` as a common diagnostic property. Objects, arrays, booleans, and nulls are not allowed.
 There may be at most 100 properties, and the final payload must not exceed 64 KiB in UTF-8.
 
@@ -38,7 +40,8 @@ There may be at most 100 properties, and the final payload must not exceed 64 Ki
 
 - `dry_run=true`: returns `dry_run`, the confirmed `company_cd`/`appid_group`, the `payload` that would be sent, the actual
   target `endpoint`, and a short-lived, single-use `confirmation_token`.
-- `dry_run=false`: returns the fields above plus the send response `send_response` and the ingestion-check row `row`.
+- `dry_run=false`: returns `dry_run`, `company_cd`, `appid_group`, `payload`, the send response `send_response`, and the
+  ingestion-check row `row` (no `endpoint` or `confirmation_token`).
 - `row=null` means ingestion could not be confirmed within the retry window; it does not confirm that the send failed.
 
 ## Decision Rules
@@ -70,11 +73,10 @@ from every metric. By default, register just the `userId`. The start date is the
 sample's timestamp, and because it affects the project's entire metric scope, propose it only for a pre-launch project.
 
 A non-administrator can list users excluded from metrics and metric start dates but cannot register or change them. If a metric
-exclusion is needed, build the file for the administrator to upload using the
-[CSV template](../../axyl-integrate-analytics-log/assets/exclude_user_template.csv) and
-[`create_exclude_user_csv.py`](../../axyl-integrate-analytics-log/scripts/create_exclude_user_csv.py). Create the file only after the user
+exclusion is needed, build the file for the administrator to upload with the CSV template and the `create_exclude_user_csv.py` script of the
+`axyl-integrate-analytics-log` skill. Create the file only after the user
 agrees to its content and path; the file format, the consent step, and the generation command follow that skill's
-documentation (sample_validation.md).
+sample send verification step.
 
 By default, hold off on the actual sample send until the administrator's change is confirmed; proceed only when the user has
 acknowledged the remaining contamination risk and explicitly approved.
@@ -101,10 +103,15 @@ automatically collected properties. The ingested data's `dataSource` is also the
 
 - Payload validation error: fix the event name, the property names and value types, and the property count and size, then start again from the dry-run.
 - Invalid AppID: reconfirm the real AppID from PROJECT_ID_GATE and the game repository configuration.
-- Organization or project authorization error: reconfirm an `org_idx` that can access the target project. Do not arbitrarily
-  use another organization's value or work around it with company permissions alone.
+- Organization or project authorization error: treat the `org_idx` as unverified; do not retry the same call unchanged or with a
+  guessed identifier; follow MCP_ACCESS_GATE (denied call with `org_idx`). Do not work around it with company permissions
+  alone. In another organization, start again from the dry-run, show the final payload again, and obtain separate approval
+  before `dry_run=false`.
 - Test identifier or time error: use the `userId`, `deviceId`, and `eventTime` returned by that same dry-run, exactly as given.
-- Send error: report the server response and do not retry automatically.
+- Starting again from the dry-run (for example, an expired token) after the test identifiers were excluded: pass the same
+  `user_id`/`device_id` into the new dry-run so the exclusion still applies.
+- Send error, or the session expired during the send: report the server response and do not retry automatically. Check with
+  `query_adhoc` before any resend.
 - `row=null`: do not conclude that the send failed — recheck shortly afterwards with `query_adhoc` within the scope whose permissions are confirmed.
 
 ## Recommended Chain

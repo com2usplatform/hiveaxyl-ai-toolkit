@@ -6,15 +6,15 @@
 
 - To query conversion rates between several event steps (for example, sign-up → tutorial complete → first payment).
 - Use it after first confirming event and filter information in the order `list_events` → `list_dimensions`.
-- **Before calling, you must obtain `org_idx`/`workspace_idx` through ORG_WORKSPACE_GATE, starting with `check_analytics_admin`.**
+- **Before calling, you must obtain `org_idx`/`workspace_idx` through ORG_WORKSPACE_GATE.**
 
 ## Parameters
 
 | Parameter | Required | Description |
 |---------|------|------|
-| `project` | Y | List of project IDs. For example, `["com.example.game"]` |
+| `project` | Y | A list holding **one** project ID, for example `["com.example.game"]`. A funnel uses only the first entry; for several projects, build one funnel per project |
 | `date_params` | Y | Date range dict (see below) |
-| `sections` | Y | List of funnel steps. Two or more (see below) |
+| `sections` | Y | List of funnel steps. The skill requires two or more (see below) |
 | `company_cd` | Y | Company code. The `company_cd` from `list_projects` |
 | `org_idx` | Y | Organization idx. Obtained through ORG_WORKSPACE_GATE |
 | `workspace_idx` | Y | Workspace idx. Obtained through ORG_WORKSPACE_GATE |
@@ -31,15 +31,17 @@
 - `start_date`/`end_date` use the `YYYY-MM-DD` format (unlike preview_chart — no hours, minutes, or seconds).
 - `start_date_type`/`end_date_type`: `"ep"` = a fixed date (explicit period).
 - For a relative period, set `start_date_type`/`end_date_type` to `"V"` and pass an integer offset from today in
-  `start_value`/`end_value`. In that case, do not compute or pass `start_date`/`end_date`.
+  `start_value`/`end_value`. In that case, do not compute or pass `start_date`/`end_date`. Unlike `preview_chart`, the
+  funnel tool does not strip them for `"V"` — if passed, they are kept as given.
 
 ### sections structure
 
 - Each step specifies the display title, the event ID and name confirmed from `list_events`, the aggregation basis
   `identifier`, and optional filters.
-- `table_description`: if omitted, `event_name` is used.
+- `table_description`: if omitted, it is left empty (a description separate from `event_name`).
 - `table_type`: `"hive"` (default) \| `"adjust"` \| `"appsflyer"`.
-- Choose `identifier` from that event's `list_dimensions` result; using the same basis across all steps is recommended.
+- Choose `identifier` from that event's `list_dimensions` result (default `"userId"`); using the same basis across all
+  steps is recommended.
 - The dimension ID, name, and data type in `filters` also come from the `list_dimensions` result.
 
 ## Return Value
@@ -52,7 +54,7 @@ The actual columns and display structure vary with the `chart_type`, `compare_ty
 
 ## Decision Rules
 
-- `sections` is meaningful only with at least two steps.
+- The skill requires at least two steps in `sections`; the server does not enforce this.
 - Do not arbitrarily guess `event_idx`/`event_name`. Always take them from the `list_events()` result (NO_GUESSING).
 - If you need filters, first confirm `dimension_idx`/`dimension_name`/`dimension_data_type` with `list_dimensions(company_cd, event_name)`.
 
@@ -60,7 +62,8 @@ The actual columns and display structure vary with the `chart_type`, `compare_ty
 
 - Empty result: check that `project` and the date range are correct.
 - API error: the error message includes the server response. Read the message and fix the parameters.
-- Organization or workspace authorization error: perform ORG_WORKSPACE_GATE again.
+- Organization or workspace authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 
 ## Recommended Chain
 

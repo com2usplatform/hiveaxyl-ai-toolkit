@@ -3,19 +3,19 @@ name: axyl-create-content
 metadata:
   version: "1.0.0"
 description: |
-  Turns a natural-language request into chart, ranking, funnel, or retention content, saves it, and assembles several
-  content items into a dashboard. Saving a single content item with no dashboard is also this skill's job.
+  Creates and saves Hive Analytics chart, ranking, funnel, or retention content, and can assemble approved content
+  into a dashboard. Follow axyl-analytics-common first.
 
   TRIGGER when:
   - The user asks to build and save a chart, ranking, funnel, or retention
-  - The user asks to create a dashboard whose composition is already finalized
-  - The user asks to bundle several metrics or charts into one dashboard
+  - The user asks to create a dashboard with an already finalized composition
+  - The user asks to bundle specified metrics or charts into one dashboard
+  - The user asks to recreate an existing dashboard or a dashboard template in another project or workspace of the same company
 
   DO NOT TRIGGER when:
-  - The composition is undecided — as in "make me a dashboard" — or recommendations by purpose, persona, genre, and BM
-    with a data-readiness assessment are needed first → axyl-design-dashboard
-  - Data is only being queried or analyzed, not saved → preview_chart or axyl-drill-down-metrics
-  - The request is to create and save a segment (a user set) or take a snapshot → axyl-create-segment
+  - The dashboard composition is undecided or needs recommendation/readiness assessment → axyl-design-dashboard
+  - The request is read-only analysis → axyl-analytics-common, axyl-detect-anomaly, or axyl-drill-down-metrics
+  - The request creates a user segment or snapshot → axyl-create-segment
   - The request is development work unrelated to analytics
 ---
 
@@ -44,7 +44,9 @@ description: |
   → [preview_chart.md](../axyl-analytics-common/references/preview_chart.md) · [preview_chart_rank.md](../axyl-analytics-common/references/preview_chart_rank.md) · [preview_funnel.md](../axyl-analytics-common/references/preview_funnel.md) · [preview_retention.md](../axyl-analytics-common/references/preview_retention.md)
 - **Duplicate check (read):** `list_contents` / `get_content` / `get_dashboard`
   → [list_contents.md](../axyl-analytics-common/references/list_contents.md) · [get_content.md](../axyl-analytics-common/references/get_content.md) · [get_dashboard.md](../axyl-analytics-common/references/get_dashboard.md)
-- **Metric registration (write, a preceding step):** `create_metric` — only when creating a metric that cannot be expressed through content arguments
+- **Template source (read):** `get_dashboard_template` / `get_content_template` — when recreating from a platform template
+  → [get_dashboard_template.md](../axyl-analytics-common/references/get_dashboard_template.md) · [get_content_template.md](../axyl-analytics-common/references/get_content_template.md)
+- **Metric registration (write, a preceding step):** `create_metric` — only in the cases listed in its "When to Use" (including a metric that cannot be expressed through content arguments, or an explicit request to register one)
   → [create_metric.md](../axyl-analytics-common/references/create_metric.md)
 
 ### Metrics That Cannot Be Expressed Through Content Arguments
@@ -54,7 +56,7 @@ description: |
   and build the content from that `metric_idx`. This needs **two approvals** — metric registration and content saving are each subject to WRITE_APPROVAL.
 - **A metric needing a first aggregation by time unit plus a second aggregation, such as peak concurrent users**, can be built
   directly from chart arguments (`group_formular`/`group_format`/`group_interval` — the "Two-stage aggregation" section of
-  [preview_chart.md](../axyl-analytics-common/references/preview_chart.md)). Register it as a metric only when it will be reused across several content items.
+  [preview_chart.md](../axyl-analytics-common/references/preview_chart.md)). Register it as a metric only in the cases `create_metric`'s "When to Use" lists (for example, reuse across several content items or an explicit request to register it).
 
 ## Reference Documents
 
@@ -83,6 +85,7 @@ Step 0-1. Is there a follow-up context handed over by design-dashboard?
 
 Step 0-1b. Is the composition decided?
   ├─ YES — the user named the metrics or charts to include, or asked for a single content item → Step 0-2
+  ├─ YES — the user asked to recreate an existing dashboard or template → "Recreating an Existing Dashboard" below
   └─ NO  — only a theme such as "make me a revenue dashboard" → hand over to axyl-design-dashboard for
            recommendation, readiness diagnosis, and composition approval. Do not decompose it here ⛔
 
@@ -97,6 +100,23 @@ are values already agreed with the user and checked for readiness. Decomposing a
 approved. If you see a reason to change something, do not change it on your own — confirm with the user. Any handed-over `excluded[]`
 is not an implementation target, so leave it out and state in the result what you left out.
 
+### Recreating an Existing Dashboard
+
+When the user asks to make an existing dashboard (or a dashboard template) again in another project or workspace **of the
+same company**. Recreating a dashboard in another company's project is not supported — the events, metrics, and properties
+belong to each company, so tell the user and stop.
+
+1. Read the source: `get_dashboard`, then `get_content` for each content item. For a platform dashboard template, use
+   `get_dashboard_template` and `get_content_template`, and convert per [template_mapping.md](references/template_mapping.md).
+2. Run Phase 1 for the **target** project and workspace, and confirm it belongs to the source's company (`company_cd`).
+   The source's events and metrics are then used as they are; confirm in the target with the Phase 2 preview that they
+   have data. When the target project differs from the source, also check each filter value (global, chart, and per-term)
+   against the target with `query_adhoc`, as in the template filter check; a value that does not exist there matches nothing.
+3. Build each content item through Phase 2 (preview in the target, duplicate check, approval, save).
+4. Assemble in Phase 3 in the source order with each item's `width`/`height`/`memo`/`row`, and carry the global period and filters
+   after the check in the `create_dashboard` reference. Text and image panels cannot be recreated; tell the user to add
+   them in the console.
+
 ### Phase 1 — Gates (axyl-analytics-common)
 
 ```
@@ -104,12 +124,18 @@ Step 1-1. PROJECT_ID_GATE       → confirm project / company_cd
 Step 1-2. ORG_WORKSPACE_GATE    → confirm org_idx / workspace_idx
 Step 1-3. SCHEMA_FIRST          → confirm the events, dimensions, and metrics each content item needs
                                   (list_metrics → list_events/list_dimensions)
-Step 1-4. DUPLICATE_GATE        → query that workspace's existing content and dashboards once with
-                                  list_contents(company_cd, org_idx, workspace_idx)
-Step 1-5. For a dashboard request, compare dashboard candidates in detail with get_dashboard before writing
+Step 1-4. DUPLICATE_GATE        → for each proposed content/dashboard, query by its name
+                                  (and metric names for registered-metric-only content)
+                                  → confirm the returned candidates in detail; do not preload the whole workspace
+Step 1-5. For a dashboard request, call get_dashboard, then get_content for every content member and compare the full
+          member compositions and dashboard-level settings before any child content is written
+          → if no duplicate was confirmed among the name candidates and any proposed member is event-based, a funnel, or a retention,
+            run one bounded widened dashboard query without name/metrics and inspect the returned dashboard rows
           ├─ identical composition → have the user choose: use the existing one / create a copy / skip ⛔
           └─ partial overlap       → state the differences and let the user choose: add the missing content to the
-                                     existing dashboard (update_dashboard) / create a new one / skip ⛔
+                                     existing dashboard (update_dashboard; offer only when its permission is EDITOR) /
+                                     create a new one / skip ⛔
+          └─ different             → state in one line what differs and proceed (DUPLICATE_GATE)
 ```
 
 **If the handed-over context has verified values, do not redo Steps 1-1 through 1-3.** `company_cd`, `project`,
@@ -119,10 +145,13 @@ different metric with a similar name.
 By contrast, **always perform Steps 1-4 and 1-5 (DUPLICATE_GATE) even with a handed-over context** — the same content may have
 been created between design time and save time, and design-dashboard cannot know the state just before the save.
 
-Do **not call Step 1-4 once per content item** — fetch the workspace list once and compare it in Phase 2 against the names and
-metrics of the content you decomposed (do not re-query the same organization repeatedly). However, if the response has
-`truncated=true`, the list was cut off, so **do not use it as comparison evidence** — re-call it in Phase 2 per content item with
-`name` (+ `metrics`).
+Do not preload the entire workspace. Reuse an identical candidate query when several proposed items share it; otherwise keep
+the initial name/metrics queries narrow. When event-based content, funnels, or retentions need a renamed-copy check, widen at
+most once per target workspace and `content_type` with the default bounded result and reuse it for every proposed item of
+that type; rerun it after a workspace change or a failed or uncertain write. If it is
+`truncated`, disclose that older renamed copies were not exhaustively checked and include that limitation with WRITE_APPROVAL.
+Use `limit=0` only when the user explicitly asks for an exhaustive audit or on an exact-name/type recovery query when checking
+whether an uncertain previous write succeeded before a retry. Never use `mine_only` in DUPLICATE_GATE.
 
 If Step 1-5 leads the user to choose using the existing dashboard or skipping, stop without previewing or saving any content.
 Proceed to Phase 2 when they choose to create a copy or to add missing content to the existing dashboard (then finish with
@@ -136,7 +165,10 @@ Step 2-0. If the handed-over context has a platform template reference, convert 
           into create_* arguments → [template_mapping.md](references/template_mapping.md)
 Step 2-1. Preview the data with preview_<type> → have the user confirm it
           └─ if the result is empty, recheck the project, period, and configuration once, then show a "currently no data" warning with the evidence
-Step 2-2. [DUPLICATE_GATE] Look for candidates with the same name or metric in the Step 1-4 list
+Step 2-2. [DUPLICATE_GATE] Select candidates from the Step 1-4 query results
+          ├─ registered-metric-only content → rows with the same name or metric
+          └─ any event-based measure, funnel, or retention → if the narrow candidates contained no duplicate,
+                                                              use the returned rows from one bounded same-type widening
           ├─ no candidate → Step 2-3
           └─ candidate    → compare params with get_content(company_cd, org_idx, workspace_idx, candidate idx)
                         ├─ same      → have the user choose: reuse the existing asset / create a copy / skip ⛔
@@ -155,9 +187,11 @@ Step 2-4. Call create_<type> → collect content_idx
   comparing `params` from `get_content`.
 - Do not rule out a duplicate just because the metrics look different — `metrics` holds only measures built from registered
   metrics, and measures built from events, along with the events of funnels and retentions, do not appear (`metrics_comparable=false`).
-  For event-based content, catching candidates by name and confirming with `get_content` is the only way.
+  A renamed event-based copy therefore cannot be caught by name or metrics. If the narrow candidates contain no duplicate, compare
+  the bounded widened same-type result with `get_content`. When it is truncated, report the unchecked older range rather
+  than automatically loading every row.
 - For period comparison, look first at `date_params`'s `start_date_type`/`end_date_type`.
-  For `"V"` (relative), compare `start_value`/`end_value` — do not compare `start_date`/`end_date` here, because they are computed
+  For `"V"` (relative), compare `period`, `start_period`/`end_period`, and `start_value`/`end_value` — do not compare `start_date`/`end_date` here, because they are computed
   at save time and the same configuration will show different dates.
   For `"F"` (fixed), the reverse holds: `start_date`/`end_date` are the configuration itself, so compare those
   (there, `start_value`/`end_value` come back as 0 and are meaningless).
@@ -174,18 +208,29 @@ Step 2-4. Call create_<type> → collect content_idx
 
 ```
 One content item & no dashboard needed → return the content url built in Phase 2 and stop
-Dashboard request                      → create_dashboard(contents=[the content_idx values confirmed in Phase 2, in display order])
+Dashboard request                      → create_dashboard(contents=[the content_idx values confirmed in Phase 2, in display order],
+                                                           date_params/adhoc_filters when requested or carried from a
+                                                           template/handoff)
                                           → return the dashboard url
 ```
 
 Judge dashboard duplicates by the dashboard copy criteria in axyl-analytics-common DUPLICATE_GATE.
-To add content to an existing dashboard, read it with `get_dashboard`, then pass the full new list to `update_dashboard`
-after WRITE_APPROVAL, carrying over each existing item's `width`/`height`/`memo` so the current layout is kept.
+To add content to an existing dashboard, read it with `get_dashboard` and confirm its `permission` is `EDITOR` before saving any
+content for it (otherwise offer a copy or a request to the author), then pass the full new list to `update_dashboard`
+after WRITE_APPROVAL, carrying over each existing item's `width`/`height`/`memo`/`row` and passing text and image panels as
+`{"panel_ref": n}` so the current layout is kept (a panel left out is not deleted; it moves to the bottom).
 Create a new dashboard only after showing the final composition and target workspace and obtaining WRITE_APPROVAL.
+When the request, a template, or a design handoff includes a dashboard-wide period or filters, pass them to
+`create_dashboard` as `date_params`/`adhoc_filters` and show the exact settings in the same WRITE_APPROVAL. Check settings
+from a template or handoff first, as the `create_dashboard` reference says (dimension, values, and a fixed period).
+A period or filter the request states for the dashboard as a whole goes into these global settings; member content keeps
+its own default period unless the user gives one per content. When the dashboard has a global period or filters, say in the
+WRITE_APPROVAL summary that the Phase 2 previews used each member's own period and settings, and that the dashboard applies
+the global ones, so its values can differ from the previews.
 
 For a new layout the tool computes placement from the contents order, so **decide the order**. To keep an existing layout — a
-template, a dashboard you are recreating, or any `update_dashboard` call — also pass each item's `width`/`height`/`memo`
-(see [layout_policy.md](references/layout_policy.md)).
+template, a dashboard you are recreating, or an `update_dashboard` call that changes `contents` — also pass each item's `width`/`height`/`memo`/`row`,
+and for `update_dashboard` the text and image panels by `panel_ref` (see [layout_policy.md](references/layout_policy.md)).
 
 ### Phase 4 — POST_WRITE_LINK
 
@@ -197,10 +242,14 @@ template, a dashboard you are recreating, or any `update_dashboard` call — als
 
 ```
 [Decompose the request]
-(PROJECT_ID_GATE) (ORG_WORKSPACE_GATE) (SCHEMA_FIRST) (DUPLICATE_GATE: check the dashboard first)
+(PROJECT_ID_GATE) (ORG_WORKSPACE_GATE) (SCHEMA_FIRST)
+Dashboard request: [DUPLICATE_GATE: get_dashboard + get_content for every content member before any child write]
+  └─ use existing / skip → stop without creating child content
 Per content item: preview_<type> → [duplicate check: get_content] → [WRITE_APPROVAL] → create_<type> → content_idx
   ├─ single & no dashboard needed → return the content url
-  └─ dashboard request            → [duplicate check: get_dashboard] → create_dashboard → return the dashboard url
+  └─ dashboard request            → new: [WRITE_APPROVAL for the final assembly] → create_dashboard
+                                    → existing dashboard change: [WRITE_APPROVAL] → update_dashboard
+                                    → return the dashboard url
 ```
 
 ---
@@ -227,9 +276,9 @@ Per content item: preview_<type> → [duplicate check: get_content] → [WRITE_A
 |------|------|
 | Empty preview result | Recheck the project, period, and configuration once and warn. Save if the user explicitly approves creating empty content |
 | Duplicate content found | Present the existing URL and the differences, and have the user choose to reuse, copy, or skip |
-| Too many `list_contents` candidates | Narrow with `workspace_idx`; if still too many, add `mine_only=true` or `content_type` |
-| `list_contents` `truncated=true` | There are more candidates — do not conclude "no duplicate"; narrow the filters and query again |
-| `create_*` failed | Parameter or validation error: fix the parameters and retry. Save API error: do not retry — the first request may have succeeded, so check with `list_contents` whether it was created. Stop if it is before dashboard assembly |
+| Too many `list_contents` candidates | Narrow with `workspace_idx`, name, and `content_type`. Do not use `mine_only` for a duplicate check; keep the widened pass bounded and disclose the unchecked older range |
+| `list_contents` `truncated=true` | Do not conclude "no duplicate" or automatically use `limit=0`; disclose incomplete coverage. Use `limit=0` only for an explicitly requested exhaustive audit or exact-name/type uncertain-write recovery |
+| `create_*` failed | First check with DUPLICATE_GATE's recovery query whether it was created anyway — the first request may have succeeded. Count it as created only when an item that was not among the candidates seen before the save matches the approved settings; an existing same-name item does not count. If it was, do not save again. If not, retry only after fresh WRITE_APPROVAL (fix the parameters first if the error requires it, and say what changed or that nothing did). Stop if it is before dashboard assembly |
 | Some content failed during dashboard assembly | Ask the user whether to proceed with only the successful `content_idx` values |
-| Organization or workspace authorization error | Perform ORG_WORKSPACE_GATE again |
-| Not connected to the Hive Axyl MCP server (first install, never signed in), or the MCP token or Hive session expired (`__AUTH_EXPIRED__`) | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |
+| Organization or workspace authorization denial | Do not retry the same call unchanged or with a guessed identifier; follow MCP_ACCESS_GATE (denied call with `org_idx`) |
+| Not connected to the Hive Axyl MCP server (first install, never signed in), or the sign-in session expired | Apply MCP_CONNECTION_GATE in axyl-analytics-common. Cannot retry without user action |

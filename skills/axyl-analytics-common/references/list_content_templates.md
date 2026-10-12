@@ -14,7 +14,7 @@ Lists platform content templates for a confirmed company.
 | Parameter | Required | Description |
 |---|---|---|
 | `company_cd` | Y | Company code confirmed by PROJECT_ID_GATE |
-| `lang` | N | Translation language. Default: `ko` |
+| `lang` | N | Translation language: `ko`, `en`, `ja`, `zh-TW`, or `th`. Default: `ko` |
 | `content_type` | N | `chart`, `chart_rank`, `funnel`, or `retention` |
 | `include_params` | N | Include every template's settings. Default: `false` |
 
@@ -33,7 +33,8 @@ chart type, and modification date. `params` is included only when requested.
 ## On Failure
 
 - Empty result with a type filter: retry without the filter before concluding that no templates exist.
-- Authentication or API error: follow common authentication handling and report the server message.
+- Authentication or API error: for an expired session follow MCP_CONNECTION_GATE, for a denial follow MCP_ACCESS_GATE, and
+  report the server message.
 
 ## Recommended Chain
 

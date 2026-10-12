@@ -7,7 +7,9 @@ Creates a new workspace in an organization. The caller becomes its OWNER.
 ## When to Use
 
 - When a new space is needed to store content
-- Always check with `list_workspaces` whether a workspace for the same purpose already exists before calling
+- Before calling, check with `list_workspaces` and ask the user whether a workspace for the same purpose already exists.
+  `list_workspaces` shows non-administrators only the workspaces they belong to, so it cannot rule out an existing
+  workspace with the same name; the console's workspace settings show them all
 
 ## Parameters
 
@@ -21,6 +23,8 @@ Creates a new workspace in an organization. The caller becomes its OWNER.
 ## Return Value
 
 Returns `workspace_idx`, the name, and `org_idx`, along with `console_url` (the screen for adding and editing members).
+`workspace_idx` can be null when the new workspace could not be identified; `console_url` then opens the workspace
+settings list. Have the user find the new workspace there, and confirm it with `list_workspaces` before using it.
 
 ## Decision Rules
 
@@ -32,13 +36,15 @@ Returns `workspace_idx`, the name, and `org_idx`, along with `console_url` (the 
 
 ## On Failure
 
-- Organization access error: recheck the accessible organizations with `list_organizations`.
-- API error: do not retry automatically. First check with `list_workspaces` whether the workspace was actually created —
-  a retry can create two workspaces with the same name, and they cannot be deleted.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- API error, or the session expired during the call: do not retry automatically. First check with `list_workspaces` whether the workspace was actually created —
+  a retry can create two workspaces with the same name, and they cannot be deleted. A same-name workspace that existed
+  before the call does not count.
 
 ## Recommended Chain
 
 ```text
-list_organizations → list_workspaces → no workspace for the same purpose
+list_organizations → list_workspaces + ask the user (console workspace settings) → no workspace for the same purpose
 → WRITE_APPROVAL → regist_workspace → point to console_url to add members
 ```

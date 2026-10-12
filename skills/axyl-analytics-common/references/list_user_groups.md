@@ -50,7 +50,8 @@ Users dormant for 3 days or more
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 - Empty result: no user groups are registered for this project.
 
 ## Recommended Chain

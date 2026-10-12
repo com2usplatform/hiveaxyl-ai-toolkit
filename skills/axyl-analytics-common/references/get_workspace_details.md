@@ -7,7 +7,7 @@ dashboard, and whether the workspace is visible.
 
 ## When to Use
 
-- To check who is using this workspace and how its permissions are structured
+- To check how many people use this workspace and how its permissions are split
 - To see whether a home dashboard is set for the workspace landing page
 - When you need more than `list_workspaces` returns, since that tool provides only what a list view needs
 
@@ -17,7 +17,7 @@ dashboard, and whether the workspace is visible.
 |---------|------|------|
 | `company_cd` | Y | Company code confirmed from `list_projects` |
 | `org_idx` | Y | Organization idx confirmed from `list_organizations` |
-| `workspace_idx` | Y | `workspace_idx` from `list_workspaces` |
+| `workspace_idx` | Y | The workspace to look up: from `list_workspaces`, a `list_contents` row, or a denied call |
 
 ## Return Value
 
@@ -31,13 +31,17 @@ Returns the name and description, `order_num`, `display_yn`, `indicator_type`, a
   to ask for access is exactly that case.
 - `dashboard_idx` of `0` means no home dashboard is set.
 - `display_yn='N'` means the workspace is not shown in the console list (effectively deleted).
-- The workspace is readable by anyone with access to the organization, even a non-member. This differs from `list_workspaces`,
-  which filters by membership, and the difference is intentional.
+- This detail call is authorized at organization scope, so a caller with organization access can read the workspace even
+  when they are not a member. For a non-administrator, `list_workspaces` filters by workspace membership; an Analytics
+  administrator instead receives every active workspace in the organization, with `member_type=null` for non-members.
 
 ## On Failure
 
-- Ownership error: the specified `workspace_idx` does not belong to that `org_idx`. Recheck with `list_workspaces`.
-- Organization access error: recheck the accessible organizations with `list_organizations`.
+- Ownership error: the workspace belongs to the organization named in the error. Confirm that organization through
+  ORG_WORKSPACE_GATE and continue there (for an access request, follow `request_workspace_permission`). Do not recheck with
+  `list_workspaces`, which lists only workspaces you belong to.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
 
 ## Recommended Chain
 

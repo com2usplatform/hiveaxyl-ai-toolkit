@@ -47,7 +47,9 @@ Returns `{"user_id", "appid_group", "last_date", "count", "properties"}`.
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (required `user_id`; `last_date` as `YYYY-MM-DD`) and call again.
 - All values `'-'`: the user exists but nothing has been collected. Do not read it as zero.
 
 ## Recommended Chain

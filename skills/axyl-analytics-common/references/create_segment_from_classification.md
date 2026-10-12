@@ -68,7 +68,10 @@ Do not assemble it yourself; use the value the tool returned (POST_WRITE_LINK).
 
 - An unknown value in `user_labels` fails with a format hint. Check the `activity_purchasing` order
   and the difference between the axes (`new` is activity only, `noPurchase` is purchasing only).
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Other API error, or the session expired during the call: the segment may exist. Do not call again until the user
+  checks the console segment list; then obtain WRITE_APPROVAL again.
 
 ## Recommended Chain
 

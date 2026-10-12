@@ -5,7 +5,9 @@
 ## When to Use
 
 - To break **any metric** into segments — by OS, country, market, language, product, and so on. It is not limited to DAU and revenue; whatever metric you put in `event_measures`, the same mechanism (the `dimensions` parameter) applies.
-- When you want to locate the cause of a sudden metric change in a particular dimension.
+- When you want to locate the cause of a sudden metric change in a particular dimension. Confirm the changed period and
+  the comparison period with the user first, query both with the same dimensions, and rank the values by how much each
+  contributed to the change.
 
 The pattern itself is the same regardless of the metric — just change `event_measures` to match the target metric. Below are two commonly used variants (DAU and revenue) as examples.
 
@@ -21,7 +23,7 @@ The pattern itself is the same regardless of the metric — just change `event_m
 5. preview_chart(...)                            → break down by dimension via the dimensions parameter
 ```
 
-> **Required keys:** `event_measures` needs all of `event_idx`/`event_name`/`dimension_idx`/`dimension_name`/`formular`.
+> **Required keys:** In event mode, `event_measures` needs all of `event_idx`/`event_name`/`dimension_idx`/`dimension_name`/`formular`.
 > `preview_chart` also requires `company_cd`/`org_idx`/`workspace_idx`. For details, see
 > `preview_chart`.
 
@@ -97,14 +99,18 @@ The pattern itself is the same regardless of the metric — just change `event_m
 > Confirm `event_idx`/`dimension_idx` by calling `list_events`/`list_dimensions` for the target metric.
 > To break down a different metric (a retention-related event, a specific action, and so on), just change
 > `event_measures` to match that metric. For `org_idx`/`workspace_idx`, use the values obtained through
-> ORG_WORKSPACE_GATE (`check_analytics_admin` → `list_organizations` → `list_workspaces`). The values above are
-> examples only — do not use them as is.
+> ORG_WORKSPACE_GATE (`check_analytics_admin` → `list_organizations` → `list_projects(company_cd, org_idx)` →
+> `list_workspaces`). The values above are examples only — do not use them as is.
 
 A **two-stage aggregation** metric such as peak concurrent users breaks down the same way — just add
 `group_formular`/`group_format`/`group_interval` to the `event_measures` entry (for example, the daily maximum of
 2-minute concurrency by OS). The second aggregation applies per combination of the chart axis and `dimensions`, so
 adding a breakdown dimension yields the maximum per that dimension.
 The key formats and constraints follow the "Two-stage aggregation" section of `preview_chart`.
+
+To break down by **values grouped into buckets**, such as by payment amount range or by level range, add `buckets`
+and `etc_label` to the `dimensions` entry. The format and constraints follow the "Dimension buckets" section
+of `preview_chart`.
 
 ## Commonly Used Breakdown Dimensions
 
@@ -120,7 +126,8 @@ The key formats and constraints follow the "Two-stage aggregation" section of `p
 
 ## Principles for Interpreting Results
 
-- **For revenue and other monetary metrics**, always display the currency basis alongside. (For example, 12,345 USD)
+- **For revenue and other monetary metrics**, always display the currency basis alongside. (For example, 12,345 USD) When its event has no `is_currency=1`
+  dimension, state that the amounts are not converted instead.
 - Do not declare a cause from a single dimension breakdown.
 - Express it as "the segment with the largest impact + the hypothesis to check."
 - Example: "Android DAU fell the most, -15% week over week. Check whether there was an Android update or a store policy change."

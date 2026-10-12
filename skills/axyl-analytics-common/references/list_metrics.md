@@ -19,9 +19,9 @@ For each metric, returns the `idx`, the category, the name and description, and 
 
 - `idx`: use as `preview_chart`'s `event_measures[].metric_idx`.
 - `metric_category`: for example `"이용자"` (Users) | `"매출"` (Revenue) | `"컨텐츠"` (Content). Because the user fills this in by hand, do not judge the metric's kind from this value alone — use it together with `metric_config`.
-- Determine whether it is a revenue metric **only** from `is_price=1` on the dimension that `metric_config` aggregates (see `list_dimensions`). The server applies the same standard when checking whether `currency` is required.
+- Determine whether it is a revenue metric **only** when the dimension that `metric_config` aggregates has `is_price=1` and its event also has an `is_currency=1` dimension (see `list_dimensions`). The server applies the same standard when checking whether `currency` is required.
 - `metric_name`: use as `preview_chart`'s `event_measures[].metric_name` (for display).
-- `metric_config`: a JSON string. Pass it through to `preview_chart` only for a revenue metric (judged by `is_price=1` as above, not by a `SUM` token).
+- `metric_config`: a JSON string. Pass it through to `preview_chart` only for a revenue metric (judged by the condition above, not by a `SUM` token).
 - A `measure[].expressions[]` entry in `metric_config` can contain either of the following. Both are computed differently from the period and aggregation the chart specifies, so if a number looks inconsistent with the period, check here first.
   - `measure_date`: the aggregation period for that entry alone. It aggregates that whole period into a single value, which enters **every date the chart selected as the same constant** (the MAU term in stickiness).
   - `measure_group_field`/`measure_group_format`/`measure_group_interval` plus a comma-joined `measure_formular` (`"COUNT_DISTINCT,MAX"`): two-stage aggregation (a first aggregation by time unit, then a second aggregation). Peak concurrent users takes this form.
@@ -34,7 +34,7 @@ For each metric, returns the `idx`, the category, the name and description, and 
 - If the metric name you want appears in `metric_name`, use metric mode (do not expand it by hand into event mode).
 - Do not parse `metric_config` and put its internal tokens (`type`/`idx`/`text`, and so on) directly into `event_measures` — pass only `metric_idx`/`metric_name` (plus `metric_config` + `currency` for a revenue metric) and the server handles the rest internally.
 - For a revenue metric, confirm the currency with `list_currencies(company_cd)` and pass `currency` as well.
-- If the metric you want does not exist, query first with `preview_chart` in event mode. Register it with `create_metric` only when it will be reused across several charts or when a term needs its own period (stickiness and the like) (a write — WRITE_APPROVAL).
+- If the metric you want does not exist, query first with `preview_chart` in event mode. Register it with `create_metric` only in the cases its "When to Use" lists — including when the user explicitly asks to register it (a write — WRITE_APPROVAL).
 
 ## On Failure
 

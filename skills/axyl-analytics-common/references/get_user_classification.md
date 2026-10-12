@@ -66,13 +66,15 @@ When activity is new, the type is new regardless of purchasing power. One type s
 
 ## On Failure
 
-- Organization or project access error: recheck the organization and project relationship.
+- Organization or project authorization denial: do not retry the same call unchanged or with a guessed identifier; follow
+  MCP_ACCESS_GATE (denied call with `org_idx`).
+- Parameter-format validation error: fix the format (required `appid_group`; dates as `YYYY-MM-DD`, `end_date` not before `start_date`) and call again.
 - All types zero: no users were classified in that period. Widen the range and query again.
 
 ## Recommended Chain
 
 ```text
-list_projects → list_organizations → get_user_classification
+list_projects → list_organizations → list_projects(company_cd, org_idx) → get_user_classification
 → (if more metrics are needed) get_user_classification_detail
 → (to extract a target) create_segment_from_classification
 ```
